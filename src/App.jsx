@@ -15,46 +15,29 @@ export default function App() {
   );
 }
 
-const [usuariosDB, setUsuariosDB] = useState([]);
-
 /* ================== HOME ================== */
 function Home() {
   const navigate = useNavigate();
-const [usuarios, setUsuarios] = useState([]);
 
-useEffect(() => {
+  const [usuariosDB, setUsuariosDB] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
 
-  const cargarUsuarios = async () => {
+  useEffect(() => {
+    const cargarUsuarios = async () => {
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("*");
 
-    const { data, error } = await supabase
-      .from("usuarios")
-      .select("*");
+      if (error) {
+        console.error("Error cargando usuarios:", error);
+      } else {
+        console.log("Usuarios DB:", data);
+        setUsuariosDB(data);
+      }
+    };
 
-    if (error) {
-      console.error("Error cargando usuarios:", error);
-    } else {
-      console.log("Usuarios DB:", data);
-      setUsuariosDB(data);
-    }
-
-  };
-
-  cargarUsuarios();
-
-}, []);
-
-usuariosDB.map((user) => (
-
-  <div key={user.id}>
-
-    <p><b>{user.nombre}</b></p>
-    <p>StateID: {user.stateid}</p>
-    <p>Edad: {user.edad}</p>
-    <p>Rol: {user.rol}</p>
-
-  </div>
-
-))
+    cargarUsuarios();
+  }, []);
 
   const usuarioGuardado = localStorage.getItem("usuario");
 
@@ -63,36 +46,45 @@ usuariosDB.map((user) => (
     else navigate("/registro");
   };
 
-  return (
-    <div className="home-container">
+return (
+  <div className="home-container">
 
-  {/* VIDEO FONDO */}
-  <video
-    className="video-bg"
-    autoPlay
-    loop
-    muted
-    playsInline
-    preload="auto"
-  >
-    <source src="/video/video.mp4" type="video/mp4" />
-  </video>
+    {/* VIDEO FONDO */}
+    <video className="video-bg" autoPlay loop muted playsInline preload="auto">
+      <source src="/video/video.mp4" type="video/mp4" />
+    </video>
 
-  {/* CONTENIDO */}
-  <div className="home-content">
-  <div className="home-card">
-    <h1>¡BIENVENIDO A OASIS ROLEPLAY!</h1>
-    <button
-  className="home-btn"
-  onClick={entrar}
->
-  Ingresar
-</button>
+    {/* CONTENIDO */}
+    <div className="home-content">
+
+      <div className="home-card">
+        <h1>¡BIENVENIDO A OASIS ROLEPLAY!</h1>
+
+        <button className="home-btn" onClick={entrar}>
+          Ingresar
+        </button>
+      </div>
+
+      {/* USUARIOS DE SUPABASE */}
+      <div className="usuarios-lista">
+
+        <h2>Personajes creados</h2>
+
+        {usuariosDB.map((user) => (
+          <div key={user.id}>
+            <p><b>{user.nombre}</b></p>
+            <p>StateID: {user.stateid}</p>
+            <p>Edad: {user.edad}</p>
+            <p>Rol: {user.rol}</p>
+          </div>
+        ))}
+
+      </div>
+
+    </div>
+
   </div>
-</div>
-
-</div>
-  );
+);
 }
 
 /* ================== REGISTRO ================== */
