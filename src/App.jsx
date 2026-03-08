@@ -63,21 +63,6 @@ return (
         <button className="home-btn" onClick={entrar}>
           Ingresar
         </button>
-      </div>
-
-      {/* USUARIOS DE SUPABASE */}
-      <div className="usuarios-lista">
-
-        <h2>Personajes creados</h2>
-
-        {usuariosDB.map((user) => (
-          <div key={user.id}>
-            <p><b>{user.nombre}</b></p>
-            <p>StateID: {user.stateid}</p>
-            <p>Edad: {user.edad}</p>
-            <p>Rol: {user.rol}</p>
-          </div>
-        ))}
 
       </div>
 
