@@ -1,3 +1,4 @@
+import { supabase } from "./supabase";
 import React, { useState, useEffect } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import "./App.css";
@@ -13,9 +14,47 @@ export default function App() {
   );
 }
 
+const [usuariosDB, setUsuariosDB] = useState([]);
+
 /* ================== HOME ================== */
 function Home() {
   const navigate = useNavigate();
+const [usuarios, setUsuarios] = useState([]);
+
+useEffect(() => {
+
+  const cargarUsuarios = async () => {
+
+    const { data, error } = await supabase
+      .from("usuarios")
+      .select("*");
+
+    if (error) {
+      console.error("Error cargando usuarios:", error);
+    } else {
+      console.log("Usuarios DB:", data);
+      setUsuariosDB(data);
+    }
+
+  };
+
+  cargarUsuarios();
+
+}, []);
+
+usuariosDB.map((user) => (
+
+  <div key={user.id}>
+
+    <p><b>{user.nombre}</b></p>
+    <p>StateID: {user.stateid}</p>
+    <p>Edad: {user.edad}</p>
+    <p>Rol: {user.rol}</p>
+
+  </div>
+
+))
+
   const usuarioGuardado = localStorage.getItem("usuario");
 
   const entrar = () => {
@@ -68,15 +107,15 @@ function Registro() {
   const [edad, setEdad] = React.useState("");
   const [nacionalidad, setNacionalidad] = React.useState("");
 
-  const enviarDatos = () => {
+const enviarDatos = async () => {
     if (!nombre || !edad || !nacionalidad) {
       alert("Completa todos los campos");
       return;
     }
 
     // Generar StateID aleatoria 0001 - 9999
-    const generarStateID = () => {
-      const numero = Math.floor(Math.random() * 9999) + 1;
+function generarStateID() {
+  return Math.floor(1000 + Math.random() * 9000)
       return numero.toString().padStart(4, "0");
     };
 
@@ -86,6 +125,39 @@ function Registro() {
       nacionalidad,
       stateId: generarStateID(),
     };
+
+const nuevo = {
+  stateId: datos.stateId,
+  nombre: datos.nombre || "Sin nombre",
+  rol: datos.rol || "civil",
+  dinero: START_MONEY,
+  inventario: [],
+  multas: [],
+  baneado:false,
+  createdAt:Date.now(),
+  updatedAt:Date.now()
+}
+
+console.log("Insertando usuario:", datos)
+
+const { data, error } = await supabase
+  .from("usuarios")
+  .insert([
+    {
+      stateid: datos.stateId,
+      nombre: datos.nombre,
+      edad: datos.edad,
+      nacionalidad: datos.nacionalidad,
+      rol: datos.rol || "civil",
+      dinero: START_MONEY
+    }
+  ])
+
+if (error) {
+  console.error("Error insertando usuario:", error)
+} else {
+  console.log("Usuario guardado en DB:", data)
+}
 
     const jugadores = JSON.parse(localStorage.getItem("jugadores")) || [];
 
@@ -140,6 +212,26 @@ function Expediente() {
 
   if (!datos) return null;
 
+  const guardarUsuarioDB = async (datos) => {
+
+  const { data, error } = await supabase
+    .from("usuarios")
+    .insert([
+      {
+        stateid: datos.stateId,
+        nombre: datos.nombre,
+        rol: datos.rol || "civil",
+        dinero: START_MONEY
+      }
+    ]);
+
+  if (error) {
+    console.error("Error guardando usuario:", error);
+  } else {
+    console.log("Usuario guardado en DB:", data);
+  }
+
+};
 
 /* ======================= STAFF SYSTEM (GLOBAL) ======================= */
 
@@ -260,7 +352,7 @@ return copia
 
 })
 
-},[datos])
+}, [datos?.stateId])  
 
 
 /* ================= USUARIO ACTUAL ================= */
