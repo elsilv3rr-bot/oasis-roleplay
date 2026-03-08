@@ -24,24 +24,34 @@ function Home() {
   };
 
   return (
-    <div
-      className="portal-container"
-      style={{ backgroundImage: "url(/fondo.jpg)" }}
-    >
-      <div className="overlay" />
-      <div className="portal-card">
-        <img
-          src="/logo.png"
-          alt="Logo Oasis"
-          className="portal-logo"
-          onError={(e) => (e.currentTarget.style.display = "none")}
-        />
-        <h1>¡BIENVENIDO A OASIS ROLEPLAY!</h1>
-        <button className="portal-button" onClick={entrar}>
-          Ingresar
-        </button>
-      </div>
-    </div>
+    <div className="home-container">
+
+  {/* VIDEO FONDO */}
+  <video
+    className="video-bg"
+    autoPlay
+    loop
+    muted
+    playsInline
+    preload="auto"
+  >
+    <source src="/video/video.mp4" type="video/mp4" />
+  </video>
+
+  {/* CONTENIDO */}
+  <div className="home-content">
+  <div className="home-card">
+    <h1>¡BIENVENIDO A OASIS ROLEPLAY!</h1>
+    <button
+  className="home-btn"
+  onClick={entrar}
+>
+  Ingresar
+</button>
+  </div>
+</div>
+
+</div>
   );
 }
 
