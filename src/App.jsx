@@ -674,6 +674,8 @@ const secciones = [
   const [compraSeleccionada, setCompraSeleccionada] = React.useState(null);
   const [vehiculoPreview, setVehiculoPreview] = React.useState(null);
   const [registrarLegalmente, setRegistrarLegalmente] = React.useState(false);
+  const [compraEnProceso, setCompraEnProceso] = React.useState(false);
+  const [compraCompletada, setCompraCompletada] = React.useState(false);
 
   const [toast, setToast] = React.useState(null);
 
@@ -923,225 +925,257 @@ React.useEffect(() => {
 
   // ================== COMPRA TIENDA (SIMPLIFICADO) ==================
 const comprarVehiculo = async () => {
-  if (!compraSeleccionada) return;
+  if (!compraSeleccionada || compraEnProceso) return;
 
-  const precio = Number(compraSeleccionada.precio);
+  setCompraEnProceso(true);
+  setCompraCompletada(false);
 
-  const cuentaActiva =
-    bank.accounts.find((a) => a.id === bank.activeAccountId) ||
-    bank.accounts?.[0];
-
-  if (!cuentaActiva) return alert("No hay cuenta activa.");
-  if (cuentaActiva.balance < precio)
-    return alert("Saldo insuficiente.");
-
-  let result;
   try {
-    result = await debitarDineroDB(precio, datos.slotNumber || 1);
-  } catch (err) {
-    return alert(err.message || "Error al procesar el pago.");
-  }
+    const precio = Number(compraSeleccionada.precio);
 
-  // Descontar del banco
-  setBank((prev) => ({
-    ...prev,
-    accounts: prev.accounts.map((a) =>
-      a.id === prev.activeAccountId
-        ? { ...a, balance: result.dinero }
-        : a
-    ),
-    transactions: [
-      {
-        id: Date.now(),
-        type: "COMPRA_VEHICULO",
-        from: cuentaActiva.name,
-        to: "Tienda Oficial",
-        amount: precio,
-        motivo: `Compra vehículo: ${compraSeleccionada.nombre}`,
-        date: new Date().toLocaleString("es-US"),
-      },
-      ...prev.transactions,
-    ],
-  }));
+    const cuentaActiva =
+      bank.accounts.find((a) => a.id === bank.activeAccountId) ||
+      bank.accounts?.[0];
 
-  // Agregar a pertenencias
-if (compraSeleccionada.tipo === "licencia") {
-  setLicencias((prev) => [
-    ...prev,
-    {
-      id: Date.now(),
-      nombre: compraSeleccionada.nombre,
-      emitida: new Date().toLocaleDateString("es-US")
-    }
-  ]);
-} else {
-  let matriculaAsignada = null;
-  if (registrarLegalmente) {
+    if (!cuentaActiva) return alert("No hay cuenta activa.");
+    if (cuentaActiva.balance < precio)
+      return alert("Saldo insuficiente.");
+
+    let result;
     try {
-      const regResult = await registrarVehiculoDB(compraSeleccionada.nombre, datos.slotNumber || 1);
-      matriculaAsignada = regResult.matricula;
-      // Actualizar saldo con el debito extra //
-      if (regResult.dinero !== undefined) {
-        setBank((prev) => ({
-          ...prev,
-          accounts: prev.accounts.map((a) =>
-            a.id === prev.activeAccountId
-              ? { ...a, balance: regResult.dinero }
-              : a
-          ),
-        }));
-      }
+      result = await debitarDineroDB(precio, datos.slotNumber || 1);
     } catch (err) {
-      // No interrumpir la compra si falla el registro //
-      console.error("Error al registrar vehículo:", err);
+      return alert(err.message || "Error al procesar el pago.");
     }
+
+    // Descontar del banco
+    setBank((prev) => ({
+      ...prev,
+      accounts: prev.accounts.map((a) =>
+        a.id === prev.activeAccountId
+          ? { ...a, balance: result.dinero }
+          : a
+      ),
+      transactions: [
+        {
+          id: Date.now(),
+          type: "COMPRA_VEHICULO",
+          from: cuentaActiva.name,
+          to: "Tienda Oficial",
+          amount: precio,
+          motivo: `Compra vehículo: ${compraSeleccionada.nombre}`,
+          date: new Date().toLocaleString("es-US"),
+        },
+        ...prev.transactions,
+      ],
+    }));
+
+    let matriculaAsignada = null;
+
+    // Agregar a pertenencias
+    if (compraSeleccionada.tipo === "licencia") {
+      setLicencias((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          nombre: compraSeleccionada.nombre,
+          emitida: new Date().toLocaleDateString("es-US")
+        }
+      ]);
+    } else {
+      if (registrarLegalmente) {
+        try {
+          const regResult = await registrarVehiculoDB(compraSeleccionada.nombre, datos.slotNumber || 1);
+          matriculaAsignada = regResult.matricula;
+          // Actualizar saldo con el debito extra //
+          if (regResult.dinero !== undefined) {
+            setBank((prev) => ({
+              ...prev,
+              accounts: prev.accounts.map((a) =>
+                a.id === prev.activeAccountId
+                  ? { ...a, balance: regResult.dinero }
+                  : a
+              ),
+            }));
+          }
+        } catch (err) {
+          // No interrumpir la compra si falla el registro //
+          console.error("Error al registrar vehículo:", err);
+        }
+      }
+
+      const nuevoVehiculo = {
+        id: Date.now(),
+        nombre: compraSeleccionada.nombre,
+        precio,
+        imagen: compraSeleccionada.imagen,
+        estado: matriculaAsignada ? "REGISTRADO" : "INSCRITO",
+        matricula: matriculaAsignada || null,
+        comprado: new Date().toLocaleString("es-US")
+      };
+
+      setPertenencias((prev) => ({
+        ...prev,
+        vehiculos: [...(prev.vehiculos || []), nuevoVehiculo],
+      }));
+    }
+
+    // Bajar stock
+    setVehiculosTienda((prev) =>
+      prev.map((v) =>
+        v.id === compraSeleccionada.id
+          ? { ...v, stock: Math.max(0, Number(v.stock) - 1) }
+          : v
+      )
+    );
+
+    // Toast
+    setToast({ type: "success", message: matriculaAsignada ? `Vehículo comprado y registrado: ${matriculaAsignada}` : "Vehículo comprado con éxito" });
+    setTimeout(() => setToast(null), 4000);
+
+    setCompraCompletada(true);
+    setTimeout(() => {
+      setCompraSeleccionada(null);
+      setRegistrarLegalmente(false);
+      setCompraCompletada(false);
+    }, 700);
+  } finally {
+    setCompraEnProceso(false);
   }
-
-  const nuevoVehiculo = {
-    id: Date.now(),
-    nombre: compraSeleccionada.nombre,
-    precio,
-    imagen: compraSeleccionada.imagen,
-    estado: matriculaAsignada ? "REGISTRADO" : "INSCRITO",
-    matricula: matriculaAsignada || null,
-    comprado: new Date().toLocaleString("es-US")
-  };
-
-  setPertenencias((prev) => ({
-    ...prev,
-    vehiculos: [...(prev.vehiculos || []), nuevoVehiculo],
-  }));
-} 
-
-  // Bajar stock
-  setVehiculosTienda((prev) =>
-    prev.map((v) =>
-      v.id === compraSeleccionada.id
-        ? { ...v, stock: Math.max(0, Number(v.stock) - 1) }
-        : v
-    )
-  );
-
-  // Toast
-  setToast({ type: "success", message: matriculaAsignada ? `Vehículo comprado y registrado: ${matriculaAsignada}` : "Vehículo comprado con éxito" });
-  setTimeout(() => setToast(null), 4000);
-
-  // Cerrar modal
-  setCompraSeleccionada(null);
-  setRegistrarLegalmente(false);
 };
 
 const comprarDocumento = async () => {
-  if (!compraSeleccionada) return;
+  if (!compraSeleccionada || compraEnProceso) return;
 
-  const precio = Number(compraSeleccionada.precio);
+  setCompraEnProceso(true);
+  setCompraCompletada(false);
 
-  const cuentaActiva =
-    bank.accounts.find((a) => a.id === bank.activeAccountId) ||
-    bank.accounts?.[0];
-
-  if (!cuentaActiva) {
-    alert("No hay cuenta activa.");
-    return;
-  }
-
-  if (cuentaActiva.balance < precio) {
-    alert("Saldo insuficiente.");
-    return;
-  }
-
-  let result;
   try {
-    result = await debitarDineroDB(precio, datos.slotNumber || 1);
-  } catch (err) {
-    return alert(err.message || "Error al procesar el pago.");
+    const precio = Number(compraSeleccionada.precio);
+
+    const cuentaActiva =
+      bank.accounts.find((a) => a.id === bank.activeAccountId) ||
+      bank.accounts?.[0];
+
+    if (!cuentaActiva) {
+      alert("No hay cuenta activa.");
+      return;
+    }
+
+    if (cuentaActiva.balance < precio) {
+      alert("Saldo insuficiente.");
+      return;
+    }
+
+    let result;
+    try {
+      result = await debitarDineroDB(precio, datos.slotNumber || 1);
+    } catch (err) {
+      return alert(err.message || "Error al procesar el pago.");
+    }
+
+    // Descontar dinero
+    setBank((prev) => ({
+      ...prev,
+      accounts: prev.accounts.map((a) =>
+        a.id === prev.activeAccountId
+          ? { ...a, balance: result.dinero }
+          : a
+      ),
+    }));
+
+    // Agregar a pertenencias
+    const nuevoDoc = {
+      id: Date.now(),
+      tipo: compraSeleccionada.nombre,
+      emitida: new Date().toLocaleDateString("es-US"),
+      vence: "Indefinido",
+    };
+
+    setPertenencias((prev) => ({
+      ...prev,
+      documentos: [...(prev.documentos || []), nuevoDoc],
+    }));
+
+    // Toast
+    setToast({
+      type: "success",
+      message: "Documento comprado con éxito",
+    });
+
+    setTimeout(() => setToast(null), 3000);
+
+    setCompraCompletada(true);
+    setTimeout(() => {
+      setCompraSeleccionada(null);
+      setCompraCompletada(false);
+    }, 700);
+  } finally {
+    setCompraEnProceso(false);
   }
-
-  // Descontar dinero
-  setBank((prev) => ({
-    ...prev,
-    accounts: prev.accounts.map((a) =>
-      a.id === prev.activeAccountId
-        ? { ...a, balance: result.dinero }
-        : a
-    ),
-  }));
-
-  // Agregar a pertenencias
-  const nuevoDoc = {
-    id: Date.now(),
-    tipo: compraSeleccionada.nombre,
-    emitida: new Date().toLocaleDateString("es-US"),
-    vence: "Indefinido",
-  };
-
-  setPertenencias((prev) => ({
-    ...prev,
-    documentos: [...(prev.documentos || []), nuevoDoc],
-  }));
-
-  // Cerrar modal
-  setCompraSeleccionada(null);
-
-  // Toast
-  setToast({
-    type: "success",
-    message: "Documento comprado con éxito",
-  });
-
-  setTimeout(() => setToast(null), 3000);
 };
 
 const comprarArma = async () => {
-  if (!compraSeleccionada) return;
+  if (!compraSeleccionada || compraEnProceso) return;
 
-  const precio = Number(compraSeleccionada.precio);
+  setCompraEnProceso(true);
+  setCompraCompletada(false);
 
-  const cuentaActiva =
-    bank.accounts.find((a) => a.id === bank.activeAccountId) ||
-    bank.accounts?.[0];
-
-  if (!cuentaActiva) return alert("No hay cuenta activa.");
-  if (cuentaActiva.balance < precio)
-    return alert("Saldo insuficiente.");
-
-  let result;
   try {
-    result = await debitarDineroDB(precio, datos.slotNumber || 1);
-  } catch (err) {
-    return alert(err.message || "Error al procesar el pago.");
+    const precio = Number(compraSeleccionada.precio);
+
+    const cuentaActiva =
+      bank.accounts.find((a) => a.id === bank.activeAccountId) ||
+      bank.accounts?.[0];
+
+    if (!cuentaActiva) return alert("No hay cuenta activa.");
+    if (cuentaActiva.balance < precio)
+      return alert("Saldo insuficiente.");
+
+    let result;
+    try {
+      result = await debitarDineroDB(precio, datos.slotNumber || 1);
+    } catch (err) {
+      return alert(err.message || "Error al procesar el pago.");
+    }
+
+    // Descontar banco
+    setBank((prev) => ({
+      ...prev,
+      accounts: prev.accounts.map((a) =>
+        a.id === prev.activeAccountId
+          ? { ...a, balance: result.dinero }
+          : a
+      ),
+    }));
+
+    // Agregar a mochila
+    const nuevaArma = {
+      id: Date.now(),
+      nombre: compraSeleccionada.nombre,
+      tipo: "arma",
+    };
+
+    setPertenencias((prev) => ({
+      ...prev,
+      mochila: [...(prev.mochila || []), nuevaArma],
+    }));
+
+    setToast({
+      type: "success",
+      message: "Arma comprada con éxito",
+    });
+
+    setTimeout(() => setToast(null), 3000);
+
+    setCompraCompletada(true);
+    setTimeout(() => {
+      setCompraSeleccionada(null);
+      setCompraCompletada(false);
+    }, 700);
+  } finally {
+    setCompraEnProceso(false);
   }
-
-  // Descontar banco
-  setBank((prev) => ({
-    ...prev,
-    accounts: prev.accounts.map((a) =>
-      a.id === prev.activeAccountId
-        ? { ...a, balance: result.dinero }
-        : a
-    ),
-  }));
-
-  // Agregar a mochila
-  const nuevaArma = {
-    id: Date.now(),
-    nombre: compraSeleccionada.nombre,
-    tipo: "arma",
-  };
-
-  setPertenencias((prev) => ({
-    ...prev,
-    mochila: [...(prev.mochila || []), nuevaArma],
-  }));
-
-  setCompraSeleccionada(null);
-
-  setToast({
-    type: "success",
-    message: "Arma comprada con éxito",
-  });
-
-  setTimeout(() => setToast(null), 3000);
 };
 
 const comprarItem = async () => {
@@ -2053,11 +2087,19 @@ const comprarItem = async () => {
 )}
 
 {compraSeleccionada && (
-  <div className="modal-backdrop" onClick={() => setCompraSeleccionada(null)}>
+  <div className="modal-backdrop" onClick={() => {
+    if (compraEnProceso) return;
+    setCompraSeleccionada(null);
+    setCompraCompletada(false);
+  }}>
     <div className="modal-compra" onClick={(e) => e.stopPropagation()}>
       <div className="modal-header">
         <h3>Confirmar Compra</h3>
-        <button className="icon-btn" onClick={() => setCompraSeleccionada(null)} aria-label="Cerrar compra">
+        <button className="icon-btn" onClick={() => {
+          if (compraEnProceso) return;
+          setCompraSeleccionada(null);
+          setCompraCompletada(false);
+        }} aria-label="Cerrar compra" disabled={compraEnProceso}>
           <AppIcon name="close" size={18} />
         </button>
       </div>
@@ -2084,7 +2126,8 @@ const comprarItem = async () => {
         )}
 
         <button
-          className="modal-pay"
+          className={`modal-pay ${compraEnProceso ? "is-loading" : ""} ${compraCompletada ? "is-success" : ""}`}
+          disabled={compraEnProceso || compraCompletada}
           onClick={() => {
   if (compraSeleccionada.tipo === "vehiculo") {
     comprarVehiculo();
@@ -2095,7 +2138,7 @@ const comprarItem = async () => {
   }
 }}
         >
-          PAGAR AHORA
+          {compraCompletada ? "COMPRA EXITOSA" : compraEnProceso ? "PROCESANDO..." : "PAGAR AHORA"}
         </button>
       </div>
     </div>
