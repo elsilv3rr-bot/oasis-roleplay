@@ -1,7 +1,7 @@
 import React from "react"
 import { useState, useEffect } from "react"
 import { Routes, Route, useNavigate, useSearchParams } from "react-router-dom"
-import { iniciarLoginDiscord, obtenerSlotsPersonajes, desbloquearSlotPersonaje, obtenerUsuario, registrarPersonaje, setToken, cerrarSesion } from "./api"
+import { iniciarLoginDiscord, obtenerSlotsPersonajes, desbloquearSlotPersonaje, obtenerUsuario, registrarPersonaje, setToken, cerrarSesion, obtenerSaldoDB, transferirDineroDB, debitarDineroDB, verificarAdmin, obtenerDatosAdmin, accionAdmin, consultaPolicial, accionPolicial, obtenerRecompensaDiaria, cobrarRecompensaDiaria, registrarVehiculoDB, obtenerMultasDB, pagarMultaDB, pagarTodasMultasDB } from "./api"
 import "./App.css"
 
 function AppIcon({ name, size = 20, className = "" }) {
@@ -216,6 +216,37 @@ function AppIcon({ name, size = 20, className = "" }) {
           <circle cx="9" cy="19" r="1.5" />
           <circle cx="17" cy="19" r="1.5" />
           <path d="M3 5h2l2.3 9.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20 8H7" />
+        </svg>
+      );
+    case "shield":
+      return (
+        <svg {...iconProps}>
+          <path d="M12 3l7 4v5c0 4.5-3 8.5-7 9.5-4-1-7-5-7-9.5V7l7-4Z" />
+          <path d="M9 12l2 2 4-4" />
+        </svg>
+      );
+    case "crown":
+      return (
+        <svg {...iconProps}>
+          <path d="M2 17l3-8 5 4 2-10 2 10 5-4 3 8H2Z" />
+          <path d="M4 17h16v2H4z" />
+        </svg>
+      );
+    case "gift":
+      return (
+        <svg {...iconProps}>
+          <rect x="3" y="8" width="18" height="4" rx="1" />
+          <rect x="5" y="12" width="14" height="8" rx="1" />
+          <path d="M12 8v12" />
+          <path d="M12 8c-2-2-5-2.5-5 0s3 2 5 2" />
+          <path d="M12 8c2-2 5-2.5 5 0s-3 2-5 2" />
+        </svg>
+      );
+    case "settings":
+      return (
+        <svg {...iconProps}>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
         </svg>
       );
     default:
@@ -628,14 +659,32 @@ const secciones = [
   { id: "pertenencias", label: "Pertenencias", icon: "box" },
   { id: "municipalidad", label: "Gestión de Multas", icon: "receipt" },
   { id: "tienda", label: "Mercado", icon: "store" },
+  { id: "recompensas", label: "Collect Diario", icon: "gift" },
 ];
+
+  // Seccion policia: solo visible si el rol es policia //
+  const esPolicia = datos.rol === "policia";
+
+  if (esPolicia) {
+    secciones.push({ id: "policia", label: "Policía", icon: "shield" });
+  }
 
   const [active, setActive] = React.useState("identidad");
   const [tiendaTab, setTiendaTab] = React.useState("vehiculos");
   const [compraSeleccionada, setCompraSeleccionada] = React.useState(null);
   const [vehiculoPreview, setVehiculoPreview] = React.useState(null);
+  const [registrarLegalmente, setRegistrarLegalmente] = React.useState(false);
 
   const [toast, setToast] = React.useState(null);
+
+  // Estado admin //
+  const [esAdminUsuario, setEsAdminUsuario] = React.useState(false);
+  const [adminPanelOpen, setAdminPanelOpen] = React.useState(false);
+
+  // Verificar admin al cargar //
+  React.useEffect(() => {
+    verificarAdmin().then(setEsAdminUsuario).catch(() => {});
+  }, []);
 
   const [vehiculosTienda, setVehiculosTienda] = React.useState([
     { id: 1, nombre: "Wolfsburgo Marin", precio: 15000, stock: 250, imagen: "/autos/Marin.png" },
@@ -849,6 +898,21 @@ React.useEffect(() => {
   const formatUSD = (n) =>
     "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 0 });
 
+  // SINCRONIZAR SALDO CON DB AL CARGAR //
+  React.useEffect(() => {
+    const slotNumber = datos?.slotNumber || 1;
+    obtenerSaldoDB(slotNumber).then((dinero) => {
+      if (dinero !== null) {
+        setBank((prev) => ({
+          ...prev,
+          accounts: prev.accounts.map((a) =>
+            a.id === "principal" ? { ...a, balance: dinero } : a
+          ),
+        }));
+      }
+    }).catch(() => {});
+  }, [datos?.slotNumber]);
+
   const toggleHideBalance = () => {
     setBank((prev) => ({ ...prev, hideBalance: !prev.hideBalance }));
   };
@@ -858,7 +922,7 @@ React.useEffect(() => {
   };
 
   // ================== COMPRA TIENDA (SIMPLIFICADO) ==================
-const comprarVehiculo = () => {
+const comprarVehiculo = async () => {
   if (!compraSeleccionada) return;
 
   const precio = Number(compraSeleccionada.precio);
@@ -871,12 +935,19 @@ const comprarVehiculo = () => {
   if (cuentaActiva.balance < precio)
     return alert("Saldo insuficiente.");
 
+  let result;
+  try {
+    result = await debitarDineroDB(precio, datos.slotNumber || 1);
+  } catch (err) {
+    return alert(err.message || "Error al procesar el pago.");
+  }
+
   // Descontar del banco
   setBank((prev) => ({
     ...prev,
     accounts: prev.accounts.map((a) =>
       a.id === prev.activeAccountId
-        ? { ...a, balance: a.balance - precio }
+        ? { ...a, balance: result.dinero }
         : a
     ),
     transactions: [
@@ -904,12 +975,35 @@ if (compraSeleccionada.tipo === "licencia") {
     }
   ]);
 } else {
+  let matriculaAsignada = null;
+  if (registrarLegalmente) {
+    try {
+      const regResult = await registrarVehiculoDB(compraSeleccionada.nombre, datos.slotNumber || 1);
+      matriculaAsignada = regResult.matricula;
+      // Actualizar saldo con el debito extra //
+      if (regResult.dinero !== undefined) {
+        setBank((prev) => ({
+          ...prev,
+          accounts: prev.accounts.map((a) =>
+            a.id === prev.activeAccountId
+              ? { ...a, balance: regResult.dinero }
+              : a
+          ),
+        }));
+      }
+    } catch (err) {
+      // No interrumpir la compra si falla el registro //
+      console.error("Error al registrar vehículo:", err);
+    }
+  }
+
   const nuevoVehiculo = {
     id: Date.now(),
     nombre: compraSeleccionada.nombre,
     precio,
     imagen: compraSeleccionada.imagen,
-    estado: "INSCRITO",
+    estado: matriculaAsignada ? "REGISTRADO" : "INSCRITO",
+    matricula: matriculaAsignada || null,
     comprado: new Date().toLocaleString("es-US")
   };
 
@@ -929,14 +1023,15 @@ if (compraSeleccionada.tipo === "licencia") {
   );
 
   // Toast
-  setToast({ type: "success", message: "Vehículo comprado con éxito" });
-  setTimeout(() => setToast(null), 3000);
+  setToast({ type: "success", message: matriculaAsignada ? `Vehículo comprado y registrado: ${matriculaAsignada}` : "Vehículo comprado con éxito" });
+  setTimeout(() => setToast(null), 4000);
 
   // Cerrar modal
   setCompraSeleccionada(null);
+  setRegistrarLegalmente(false);
 };
 
-const comprarDocumento = () => {
+const comprarDocumento = async () => {
   if (!compraSeleccionada) return;
 
   const precio = Number(compraSeleccionada.precio);
@@ -955,12 +1050,19 @@ const comprarDocumento = () => {
     return;
   }
 
+  let result;
+  try {
+    result = await debitarDineroDB(precio, datos.slotNumber || 1);
+  } catch (err) {
+    return alert(err.message || "Error al procesar el pago.");
+  }
+
   // Descontar dinero
   setBank((prev) => ({
     ...prev,
     accounts: prev.accounts.map((a) =>
       a.id === prev.activeAccountId
-        ? { ...a, balance: a.balance - precio }
+        ? { ...a, balance: result.dinero }
         : a
     ),
   }));
@@ -990,7 +1092,7 @@ const comprarDocumento = () => {
   setTimeout(() => setToast(null), 3000);
 };
 
-const comprarArma = () => {
+const comprarArma = async () => {
   if (!compraSeleccionada) return;
 
   const precio = Number(compraSeleccionada.precio);
@@ -1003,12 +1105,19 @@ const comprarArma = () => {
   if (cuentaActiva.balance < precio)
     return alert("Saldo insuficiente.");
 
+  let result;
+  try {
+    result = await debitarDineroDB(precio, datos.slotNumber || 1);
+  } catch (err) {
+    return alert(err.message || "Error al procesar el pago.");
+  }
+
   // Descontar banco
   setBank((prev) => ({
     ...prev,
     accounts: prev.accounts.map((a) =>
       a.id === prev.activeAccountId
-        ? { ...a, balance: a.balance - precio }
+        ? { ...a, balance: result.dinero }
         : a
     ),
   }));
@@ -1035,7 +1144,7 @@ const comprarArma = () => {
   setTimeout(() => setToast(null), 3000);
 };
 
-const comprarItem = () => {
+const comprarItem = async () => {
   if (!compraSeleccionada) return;
 
   const precio = Number(compraSeleccionada.precio);
@@ -1054,12 +1163,31 @@ const comprarItem = () => {
     return;
   }
 
+  // SI ES LICENCIA → verificar duplicado antes de cobrar //
+  if (compraSeleccionada.tipo === "licencia") {
+    const yaExiste = licencias.some(
+      (l) => l.nombre === compraSeleccionada.nombre
+    );
+    if (yaExiste) {
+      alert("Ya tienes esta licencia.");
+      setCompraSeleccionada(null);
+      return;
+    }
+  }
+
+  let result;
+  try {
+    result = await debitarDineroDB(precio, datos.slotNumber || 1);
+  } catch (err) {
+    return alert(err.message || "Error al procesar el pago.");
+  }
+
   // DESCONTAR DINERO
   setBank((prev) => ({
     ...prev,
     accounts: prev.accounts.map((a) =>
       a.id === prev.activeAccountId
-        ? { ...a, balance: a.balance - precio }
+        ? { ...a, balance: result.dinero }
         : a
     ),
     transactions: [
@@ -1078,18 +1206,6 @@ const comprarItem = () => {
 
   // SI ES LICENCIA → AGREGAR A PERTENENCIAS
   if (compraSeleccionada.tipo === "licencia") {
-
-    // Evitar duplicados
-    const yaExiste = licencias.some(
-      (l) => l.nombre === compraSeleccionada.nombre
-    );
-
-    if (yaExiste) {
-      alert("Ya tienes esta licencia.");
-      setCompraSeleccionada(null);
-      return;
-    }
-
     const nuevaLicencia = {
       id: Date.now(),
       nombre: compraSeleccionada.nombre,
@@ -1182,7 +1298,7 @@ const comprarItem = () => {
     setOpenContact(false);
   };
 
-  const submitTransfer = () => {
+  const submitTransfer = async () => {
     const amount = Number(String(monto).replace(/[^\d]/g, ""));
     if (!amount || amount <= 0) return alert("Monto inválido");
 
@@ -1196,15 +1312,19 @@ const comprarItem = () => {
 
     if (stateId === bank.stateId) return alert("No puedes transferirte a ti mismo.");
 
-    const lista = JSON.parse(localStorage.getItem("stateIDs")) || [];
-    if (!lista.includes(stateId)) return alert("El StateID no existe.");
-
     const ok = confirm(`¿Enviar ${formatUSD(amount)} al StateID ${stateId}?`);
     if (!ok) return;
 
+    let result;
+    try {
+      result = await transferirDineroDB(stateId, amount, datos.slotNumber || 1);
+    } catch (err) {
+      return alert(err.message || "Error al transferir. Intenta de nuevo.");
+    }
+
     setBank((prev) => {
       const newAccounts = prev.accounts.map((a) =>
-        a.id === fromAccountId ? { ...a, balance: a.balance - amount } : a
+        a.id === fromAccountId ? { ...a, balance: result.dinero } : a
       );
 
       const tx = {
@@ -1233,7 +1353,7 @@ const comprarItem = () => {
   const parseMonto = (m) => Number(String(m ?? "").replace(/[^\d]/g, "")) || 0;
   const totalMultas = multasState.reduce((acc, m) => acc + parseMonto(m.monto), 0);
 
-  const pagarMulta = (multaId) => {
+  const pagarMulta = async (multaId) => {
     const multa = multasState.find((m) => m.id === multaId);
     if (!multa) return;
 
@@ -1248,10 +1368,17 @@ const comprarItem = () => {
     const ok = confirm(`¿Pagar multa por ${formatUSD(amount)}?`);
     if (!ok) return;
 
+    let result;
+    try {
+      result = await debitarDineroDB(amount, datos.slotNumber || 1);
+    } catch (err) {
+      return alert(err.message || "Error al pagar la multa. Intenta de nuevo.");
+    }
+
     setBank((prev) => ({
       ...prev,
       accounts: prev.accounts.map((a) =>
-        a.id === prev.activeAccountId ? { ...a, balance: a.balance - amount } : a
+        a.id === prev.activeAccountId ? { ...a, balance: result.dinero } : a
       ),
       transactions: [
         {
@@ -1270,7 +1397,7 @@ const comprarItem = () => {
     setMultasState((prev) => prev.filter((m) => m.id !== multaId));
   };
 
-  const pagarTodo = () => {
+  const pagarTodo = async () => {
     if (multasState.length === 0) return;
 
     const amount = totalMultas;
@@ -1282,10 +1409,17 @@ const comprarItem = () => {
     const ok = confirm(`¿Pagar TODAS las multas por ${formatUSD(amount)}?`);
     if (!ok) return;
 
+    let result;
+    try {
+      result = await debitarDineroDB(amount, datos.slotNumber || 1);
+    } catch (err) {
+      return alert(err.message || "Error al pagar las multas. Intenta de nuevo.");
+    }
+
     setBank((prev) => ({
       ...prev,
       accounts: prev.accounts.map((a) =>
-        a.id === prev.activeAccountId ? { ...a, balance: a.balance - amount } : a
+        a.id === prev.activeAccountId ? { ...a, balance: result.dinero } : a
       ),
       transactions: [
         {
@@ -1325,6 +1459,17 @@ const comprarItem = () => {
           )}
           <span>DISCORD</span>
         </button>
+
+        {/* BOTON ADMIN (al lado de Discord) */}
+        {esAdminUsuario && (
+          <button
+            className="admin-flotante-btn"
+            onClick={() => { setAdminPanelOpen(true); setActive("admin"); }}
+          >
+            <AppIcon name="settings" size={18} />
+            <span>ADMIN</span>
+          </button>
+        )}
 
         {/* PANEL DESPLEGABLE */}
         {discordPanelOpen && (
@@ -1925,6 +2070,19 @@ const comprarItem = () => {
           {Number(compraSeleccionada.precio).toLocaleString("es-US")}
         </p>
 
+        {compraSeleccionada.tipo === "vehiculo" && (
+          <label className="registro-legal-check">
+            <input type="checkbox" checked={registrarLegalmente} onChange={e => setRegistrarLegalmente(e.target.checked)} />
+            Registrar legalmente (+$2,500 · incluye matrícula)
+          </label>
+        )}
+
+        {compraSeleccionada.tipo === "vehiculo" && registrarLegalmente && (
+          <p className="registro-legal-total">
+            Total: ${(Number(compraSeleccionada.precio) + 2500).toLocaleString("es-US")}
+          </p>
+        )}
+
         <button
           className="modal-pay"
           onClick={() => {
@@ -2061,12 +2219,613 @@ const comprarItem = () => {
                 active !== "finanzas" &&
                 active !== "pertenencias" &&
                 active !== "municipalidad" &&
-                active !== "tienda" && (
+                active !== "tienda" &&
+                active !== "recompensas" &&
+                active !== "policia" &&
+                active !== "admin" && (
                   <div className="right-empty">
                   </div>
                 )}
+
+              {/* ================= COLLECT DIARIO ================= */}
+              {active === "recompensas" && (
+                <RecompensasPanel datos={datos} setBank={setBank} />
+              )}
+
+              {/* ================= POLICIA ================= */}
+              {active === "policia" && esPolicia && (
+                <PoliciaPanel datos={datos} />
+              )}
+
+              {/* ================= ADMIN PANEL ================= */}
+              {active === "admin" && esAdminUsuario && (
+                <AdminPanel discordId={discordUser?.discordId} />
+              )}
             </div> {/* right-list-card */}
           </main>
         </div>
       );
     }
+
+/* ================== PANEL DE RECOMPENSAS (COLLECT DIARIO) ================== */
+function RecompensasPanel({ datos, setBank }) {
+  const [estado, setEstado] = React.useState(null);
+  const [cargando, setCargando] = React.useState(true);
+  const [cobrando, setCobrando] = React.useState(false);
+  const [mensaje, setMensaje] = React.useState(null);
+
+  const cargarEstado = React.useCallback(async () => {
+    try {
+      const data = await obtenerRecompensaDiaria(datos.slotNumber || 1);
+      setEstado(data);
+    } catch (err) {
+      setMensaje({ tipo: "error", texto: err.message });
+    } finally {
+      setCargando(false);
+    }
+  }, [datos.slotNumber]);
+
+  React.useEffect(() => { cargarEstado(); }, [cargarEstado]);
+
+  const cobrar = async () => {
+    setCobrando(true);
+    setMensaje(null);
+    try {
+      const data = await cobrarRecompensaDiaria(datos.slotNumber || 1);
+      setMensaje({ tipo: "ok", texto: data.mensaje || `¡Cobraste $${data.monto?.toLocaleString()}!` });
+
+      // Actualizar saldo en el banco //
+      if (setBank && data.dinero !== undefined) {
+        setBank(prev => ({
+          ...prev,
+          accounts: prev.accounts.map(a =>
+            a.id === "principal" ? { ...a, balance: data.dinero } : a
+          ),
+        }));
+      }
+
+      await cargarEstado();
+    } catch (err) {
+      setMensaje({ tipo: "error", texto: err.message });
+    } finally {
+      setCobrando(false);
+    }
+  };
+
+  if (cargando) return <div className="recompensas-wrap"><p>Cargando...</p></div>;
+
+  return (
+    <div className="recompensas-wrap">
+      <div className="recompensas-hero">
+        <AppIcon name="gift" size={40} />
+        <h2>Collect Diario</h2>
+        <p>Reclama tu recompensa diaria según tu nivel VIP y profesión.</p>
+      </div>
+
+      {mensaje && (
+        <div className={`recompensas-msg ${mensaje.tipo}`}>{mensaje.texto}</div>
+      )}
+
+      {estado && (
+        <div className="recompensas-grid">
+          <div className="recompensas-card">
+            <div className="recompensas-card-titulo">VIP: {estado.desglose?.vip?.nivel?.toUpperCase()}</div>
+            <div className="recompensas-card-valor">+${estado.desglose?.vip?.monto?.toLocaleString()}</div>
+          </div>
+
+          <div className="recompensas-card">
+            <div className="recompensas-card-titulo">Profesión: {estado.desglose?.profesion?.rol?.toUpperCase()}</div>
+            <div className="recompensas-card-valor">+${estado.desglose?.profesion?.monto?.toLocaleString()}</div>
+          </div>
+
+          <div className="recompensas-card recompensas-card-total">
+            <div className="recompensas-card-titulo">TOTAL DIARIO</div>
+            <div className="recompensas-card-total-valor">${estado.monto?.toLocaleString()}</div>
+          </div>
+        </div>
+      )}
+
+      <button
+        className="recompensas-cobrar-btn"
+        onClick={cobrar}
+        disabled={cobrando || estado?.yaCobrado}
+      >
+        {estado?.yaCobrado ? "YA COBRASTE HOY" : cobrando ? "COBRANDO..." : "COBRAR RECOMPENSA"}
+      </button>
+
+      {estado?.personaje && (
+        <div className="recompensas-saldo">
+          Saldo actual: <strong>${estado.personaje.dinero?.toLocaleString()}</strong>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ================== PANEL POLICIAL ================== */
+function PoliciaPanel({ datos }) {
+  const [tab, setTab] = React.useState("buscar");
+  const [busqueda, setBusqueda] = React.useState("");
+  const [resultado, setResultado] = React.useState(null);
+  const [cargando, setCargando] = React.useState(false);
+  const [mensaje, setMensaje] = React.useState(null);
+
+  // Campos multa //
+  const [multaStateid, setMultaStateid] = React.useState("");
+  const [multaMotivo, setMultaMotivo] = React.useState("");
+  const [multaMonto, setMultaMonto] = React.useState("");
+
+  // Campos cargo //
+  const [cargoStateid, setCargoStateid] = React.useState("");
+  const [cargoTexto, setCargoTexto] = React.useState("");
+  const [cargoGravedad, setCargoGravedad] = React.useState("leve");
+
+  // Campos matricula //
+  const [matriculaBusqueda, setMatriculaBusqueda] = React.useState("");
+  const [vehiculoResultado, setVehiculoResultado] = React.useState(null);
+
+  const buscarCiudadano = async () => {
+    if (!busqueda.trim()) return;
+    setCargando(true);
+    setResultado(null);
+    setMensaje(null);
+    try {
+      const data = await consultaPolicial("consultar_ciudadano", `&stateid=${busqueda.trim()}`, datos.slotNumber || 1);
+      setResultado(data);
+    } catch (err) {
+      setMensaje({ tipo: "error", texto: err.message });
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const imponerMulta = async () => {
+    if (!multaStateid || !multaMotivo || !multaMonto) return;
+    setMensaje(null);
+    try {
+      await accionPolicial({
+        accion: "imponer_multa",
+        stateid_infractor: multaStateid.trim(),
+        motivo: multaMotivo,
+        monto: Number(multaMonto),
+        slotNumber: datos.slotNumber || 1,
+      });
+      setMensaje({ tipo: "ok", texto: "Multa impuesta correctamente" });
+      setMultaStateid(""); setMultaMotivo(""); setMultaMonto("");
+    } catch (err) {
+      setMensaje({ tipo: "error", texto: err.message });
+    }
+  };
+
+  const agregarCargo = async () => {
+    if (!cargoStateid || !cargoTexto) return;
+    setMensaje(null);
+    try {
+      await accionPolicial({
+        accion: "agregar_cargo",
+        stateid_acusado: cargoStateid.trim(),
+        cargo: cargoTexto,
+        gravedad: cargoGravedad,
+        slotNumber: datos.slotNumber || 1,
+      });
+      setMensaje({ tipo: "ok", texto: "Cargo judicial registrado" });
+      setCargoStateid(""); setCargoTexto(""); setCargoGravedad("leve");
+    } catch (err) {
+      setMensaje({ tipo: "error", texto: err.message });
+    }
+  };
+
+  const buscarMatricula = async () => {
+    if (!matriculaBusqueda.trim()) return;
+    setVehiculoResultado(null);
+    try {
+      const data = await consultaPolicial("consultar_matricula", `&matricula=${matriculaBusqueda.trim()}`, datos.slotNumber || 1);
+      setVehiculoResultado(data.vehiculo);
+    } catch (err) {
+      setMensaje({ tipo: "error", texto: err.message });
+    }
+  };
+
+  return (
+    <div className="policia-wrap">
+      <div className="policia-hero">
+        <AppIcon name="shield" size={36} />
+        <h2>Panel Policial</h2>
+        <p>Placa: <strong>{datos.placa_policial || datos.placaPolicial || "---"}</strong> · Oficial: <strong>{datos.nombre}</strong></p>
+      </div>
+
+      {mensaje && (
+        <div className={`policia-msg ${mensaje.tipo}`}>{mensaje.texto}</div>
+      )}
+
+      <div className="policia-tabs">
+        {["buscar", "multar", "cargos", "matriculas"].map(t => (
+          <button key={t} className={`tab-btn ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>
+            {t === "buscar" && "Buscar Ciudadano"}
+            {t === "multar" && "Imponer Multa"}
+            {t === "cargos" && "Cargos Judiciales"}
+            {t === "matriculas" && "Matrículas"}
+          </button>
+        ))}
+      </div>
+
+      {/* Buscar ciudadano */}
+      {tab === "buscar" && (
+        <div className="policia-seccion">
+          <div className="policia-input-row">
+            <input placeholder="StateID del ciudadano" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+            <button className="policia-btn" onClick={buscarCiudadano} disabled={cargando}>
+              {cargando ? "Buscando..." : "Buscar"}
+            </button>
+          </div>
+
+          {resultado && resultado.ciudadano && (
+            <div className="policia-resultado">
+              <div className="policia-dato"><strong>Nombre:</strong> {resultado.ciudadano.nombre}</div>
+              <div className="policia-dato"><strong>Edad:</strong> {resultado.ciudadano.edad}</div>
+              <div className="policia-dato"><strong>Nacionalidad:</strong> {resultado.ciudadano.nacionalidad}</div>
+              <div className="policia-dato"><strong>Rol:</strong> {resultado.ciudadano.rol}</div>
+              <div className="policia-dato"><strong>VIP:</strong> {resultado.ciudadano.nivel_vip}</div>
+
+              {resultado.multas?.length > 0 && (
+                <>
+                  <h4>Multas ({resultado.multas.length})</h4>
+                  {resultado.multas.map(m => (
+                    <div key={m.id} className="policia-multa-item">
+                      <span>{m.motivo}</span>
+                      <span>${Number(m.monto).toLocaleString()}</span>
+                      <span className={m.pagada ? "pagada" : "pendiente"}>{m.pagada ? "Pagada" : "Pendiente"}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {resultado.cargos?.length > 0 && (
+                <>
+                  <h4>Cargos Judiciales ({resultado.cargos.length})</h4>
+                  {resultado.cargos.map(c => (
+                    <div key={c.id} className="policia-cargo-item">
+                      <span>{c.cargo}</span>
+                      <span className={`gravedad-${c.gravedad}`}>{c.gravedad}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Imponer multa */}
+      {tab === "multar" && (
+        <div className="policia-seccion">
+          <input placeholder="StateID del infractor" value={multaStateid} onChange={e => setMultaStateid(e.target.value)} />
+          <input placeholder="Motivo de la multa" value={multaMotivo} onChange={e => setMultaMotivo(e.target.value)} />
+          <input placeholder="Monto ($)" type="number" value={multaMonto} onChange={e => setMultaMonto(e.target.value)} />
+          <button className="policia-btn" onClick={imponerMulta}>Imponer Multa</button>
+        </div>
+      )}
+
+      {/* Cargos judiciales */}
+      {tab === "cargos" && (
+        <div className="policia-seccion">
+          <input placeholder="StateID del acusado" value={cargoStateid} onChange={e => setCargoStateid(e.target.value)} />
+          <input placeholder="Descripción del cargo" value={cargoTexto} onChange={e => setCargoTexto(e.target.value)} />
+          <select value={cargoGravedad} onChange={e => setCargoGravedad(e.target.value)}>
+            <option value="leve">Leve</option>
+            <option value="moderado">Moderado</option>
+            <option value="grave">Grave</option>
+          </select>
+          <button className="policia-btn" onClick={agregarCargo}>Registrar Cargo</button>
+        </div>
+      )}
+
+      {/* Matriculas */}
+      {tab === "matriculas" && (
+        <div className="policia-seccion">
+          <div className="policia-input-row">
+            <input placeholder="Buscar matrícula (ej: OA-AB1234)" value={matriculaBusqueda} onChange={e => setMatriculaBusqueda(e.target.value)} />
+            <button className="policia-btn" onClick={buscarMatricula}>Buscar</button>
+          </div>
+
+          {vehiculoResultado && (
+            <div className="policia-resultado">
+              <div className="policia-dato"><strong>Matrícula:</strong> {vehiculoResultado.matricula}</div>
+              <div className="policia-dato"><strong>Vehículo:</strong> {vehiculoResultado.nombre_vehiculo}</div>
+              <div className="policia-dato"><strong>Propietario:</strong> {vehiculoResultado.nombre_propietario || vehiculoResultado.stateid_propietario}</div>
+              <div className="policia-dato"><strong>Registro:</strong> {new Date(vehiculoResultado.fecha_registro).toLocaleDateString("es-CL")}</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ================== PANEL ADMINISTRATIVO ================== */
+function AdminPanel({ discordId }) {
+  const [tab, setTab] = React.useState("usuarios");
+  const [busqueda, setBusqueda] = React.useState("");
+  const [usuarios, setUsuarios] = React.useState([]);
+  const [profesiones, setProfesiones] = React.useState([]);
+  const [admins, setAdmins] = React.useState([]);
+  const [niveles, setNiveles] = React.useState([]);
+  const [logs, setLogs] = React.useState([]);
+  const [mensaje, setMensaje] = React.useState(null);
+  const [cargando, setCargando] = React.useState(false);
+
+  // Campos de accion //
+  const [seleccionado, setSeleccionado] = React.useState(null);
+  const [cantidadDinero, setCantidadDinero] = React.useState("");
+  const [operacionDinero, setOperacionDinero] = React.useState("agregar");
+  const [rolAsignar, setRolAsignar] = React.useState("");
+  const [placaAsignar, setPlacaAsignar] = React.useState("");
+  const [vipAsignar, setVipAsignar] = React.useState("");
+  const [nuevoAdminId, setNuevoAdminId] = React.useState("");
+
+  // Campos profesion //
+  const [nuevaProfNombre, setNuevaProfNombre] = React.useState("");
+  const [nuevaProfDesc, setNuevaProfDesc] = React.useState("");
+  const [nuevaProfSalario, setNuevaProfSalario] = React.useState("");
+
+  // Campos VIP //
+  const [nuevoVipNombre, setNuevoVipNombre] = React.useState("");
+  const [nuevoVipRecompensa, setNuevoVipRecompensa] = React.useState("");
+
+  const limpiarMensaje = () => setTimeout(() => setMensaje(null), 3000);
+
+  const cargarUsuarios = async () => {
+    setCargando(true);
+    try {
+      const data = await obtenerDatosAdmin("usuarios", busqueda ? `&busqueda=${encodeURIComponent(busqueda)}` : "");
+      setUsuarios(data.usuarios || []);
+    } catch (err) {
+      setMensaje({ tipo: "error", texto: err.message });
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const cargarProfesiones = async () => {
+    try {
+      const data = await obtenerDatosAdmin("profesiones");
+      setProfesiones(data.profesiones || []);
+    } catch {}
+  };
+
+  const cargarAdmins = async () => {
+    try {
+      const data = await obtenerDatosAdmin("admins");
+      setAdmins(data.admins || []);
+    } catch {}
+  };
+
+  const cargarNiveles = async () => {
+    try {
+      const data = await obtenerDatosAdmin("niveles_vip");
+      setNiveles(data.niveles || []);
+    } catch {}
+  };
+
+  const cargarLogs = async () => {
+    try {
+      const data = await obtenerDatosAdmin("logs");
+      setLogs(data.logs || []);
+    } catch {}
+  };
+
+  React.useEffect(() => {
+    cargarUsuarios();
+    cargarProfesiones();
+    cargarAdmins();
+    cargarNiveles();
+  }, []);
+
+  const ejecutarAccion = async (accion, payload) => {
+    setMensaje(null);
+    try {
+      await accionAdmin({ accion, ...payload });
+      setMensaje({ tipo: "ok", texto: "Acción ejecutada correctamente" });
+      limpiarMensaje();
+
+      if (accion.includes("profesion")) cargarProfesiones();
+      if (accion.includes("admin")) cargarAdmins();
+      if (accion.includes("vip")) cargarNiveles();
+      if (accion.includes("dinero") || accion.includes("rol") || accion.includes("placa")) cargarUsuarios();
+    } catch (err) {
+      setMensaje({ tipo: "error", texto: err.message });
+    }
+  };
+
+  return (
+    <div className="admin-wrap">
+      <div className="admin-hero">
+        <AppIcon name="settings" size={36} />
+        <h2>Panel Administrativo</h2>
+      </div>
+
+      {mensaje && (
+        <div className={`admin-msg ${mensaje.tipo}`}>{mensaje.texto}</div>
+      )}
+
+      <div className="admin-tabs">
+        {[
+          { id: "usuarios", label: "Usuarios" },
+          { id: "profesiones", label: "Profesiones" },
+          { id: "vip", label: "Niveles VIP" },
+          { id: "admins", label: "Administradores" },
+          { id: "logs", label: "Logs" },
+        ].map(t => (
+          <button
+            key={t.id}
+            className={`tab-btn ${tab === t.id ? "active" : ""}`}
+            onClick={() => { setTab(t.id); if (t.id === "logs") cargarLogs(); }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* GESTION DE USUARIOS */}
+      {tab === "usuarios" && (
+        <div className="admin-seccion">
+          <div className="admin-input-row">
+            <input placeholder="Buscar por nombre, stateID o Discord ID" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+            <button className="admin-btn" onClick={cargarUsuarios} disabled={cargando}>Buscar</button>
+          </div>
+
+          <div className="admin-usuarios-grid">
+            {usuarios.map(u => (
+              <div key={u.id} className={`admin-user-card ${seleccionado?.id === u.id ? "selected" : ""}`}
+                onClick={() => setSeleccionado(u)}>
+                <div><strong>{u.nombre}</strong> · {u.stateid}</div>
+                <div className="admin-user-meta">Rol: {u.rol} · VIP: {u.nivel_vip} · ${Number(u.dinero).toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+
+          {seleccionado && (
+            <div className="admin-acciones">
+              <h3>Acciones sobre: {seleccionado.nombre} ({seleccionado.stateid})</h3>
+
+              <div className="admin-accion-grupo">
+                <h4>Dinero</h4>
+                <div className="admin-input-row">
+                  <select value={operacionDinero} onChange={e => setOperacionDinero(e.target.value)}>
+                    <option value="agregar">Agregar</option>
+                    <option value="quitar">Quitar</option>
+                  </select>
+                  <input type="number" placeholder="Cantidad" value={cantidadDinero} onChange={e => setCantidadDinero(e.target.value)} />
+                  <button className="admin-btn" onClick={() => {
+                    ejecutarAccion("modificar_dinero", { stateid: seleccionado.stateid, cantidad: cantidadDinero, operacion: operacionDinero });
+                    setCantidadDinero("");
+                  }}>Aplicar</button>
+                </div>
+              </div>
+
+              <div className="admin-accion-grupo">
+                <h4>Rol / Profesión</h4>
+                <div className="admin-input-row">
+                  <select value={rolAsignar} onChange={e => setRolAsignar(e.target.value)}>
+                    <option value="">Seleccionar rol</option>
+                    {profesiones.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                  <button className="admin-btn" onClick={() => { ejecutarAccion("asignar_rol", { stateid: seleccionado.stateid, rol: rolAsignar }); }}>Asignar</button>
+                </div>
+              </div>
+
+              <div className="admin-accion-grupo">
+                <h4>Placa Policial</h4>
+                <div className="admin-input-row">
+                  <input placeholder="N° de placa" value={placaAsignar} onChange={e => setPlacaAsignar(e.target.value)} />
+                  <button className="admin-btn" onClick={() => { ejecutarAccion("asignar_placa", { stateid: seleccionado.stateid, placa: placaAsignar }); setPlacaAsignar(""); }}>Asignar Placa</button>
+                </div>
+              </div>
+
+              <div className="admin-accion-grupo">
+                <h4>Nivel VIP</h4>
+                <div className="admin-input-row">
+                  <select value={vipAsignar} onChange={e => setVipAsignar(e.target.value)}>
+                    <option value="">Seleccionar VIP</option>
+                    {niveles.map(n => <option key={n.id} value={n.nombre}>{n.nombre} (+${n.recompensa_diaria})</option>)}
+                  </select>
+                  <button className="admin-btn" onClick={() => { ejecutarAccion("asignar_vip", { stateid: seleccionado.stateid, nivel: vipAsignar }); }}>Asignar VIP</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* GESTION DE PROFESIONES */}
+      {tab === "profesiones" && (
+        <div className="admin-seccion">
+          <div className="admin-lista">
+            {profesiones.map(p => (
+              <div key={p.id} className="admin-list-item">
+                <div><strong>{p.nombre}</strong> · Salario: ${p.salario_diario?.toLocaleString()}</div>
+                <div className="admin-list-desc">{p.descripcion}</div>
+                <button className="admin-btn-danger" onClick={() => ejecutarAccion("eliminar_profesion", { id: p.id })}>Eliminar</button>
+              </div>
+            ))}
+          </div>
+
+          <div className="admin-form-crear">
+            <h4>Crear Nueva Profesión</h4>
+            <input placeholder="Nombre" value={nuevaProfNombre} onChange={e => setNuevaProfNombre(e.target.value)} />
+            <input placeholder="Descripción" value={nuevaProfDesc} onChange={e => setNuevaProfDesc(e.target.value)} />
+            <input type="number" placeholder="Salario diario" value={nuevaProfSalario} onChange={e => setNuevaProfSalario(e.target.value)} />
+            <button className="admin-btn" onClick={() => {
+              ejecutarAccion("crear_profesion", { nombre: nuevaProfNombre, descripcion: nuevaProfDesc, salario_diario: nuevaProfSalario });
+              setNuevaProfNombre(""); setNuevaProfDesc(""); setNuevaProfSalario("");
+            }}>Crear Profesión</button>
+          </div>
+        </div>
+      )}
+
+      {/* GESTION DE NIVELES VIP */}
+      {tab === "vip" && (
+        <div className="admin-seccion">
+          <div className="admin-lista">
+            {niveles.map(n => (
+              <div key={n.id} className="admin-list-item">
+                <div><strong>{n.nombre}</strong> · Recompensa: ${n.recompensa_diaria?.toLocaleString()}/día</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="admin-form-crear">
+            <h4>Crear / Modificar Nivel VIP</h4>
+            <input placeholder="Nombre del nivel" value={nuevoVipNombre} onChange={e => setNuevoVipNombre(e.target.value)} />
+            <input type="number" placeholder="Recompensa diaria ($)" value={nuevoVipRecompensa} onChange={e => setNuevoVipRecompensa(e.target.value)} />
+            <button className="admin-btn" onClick={() => {
+              ejecutarAccion("modificar_vip", { nombre: nuevoVipNombre, recompensa_diaria: nuevoVipRecompensa });
+              setNuevoVipNombre(""); setNuevoVipRecompensa("");
+            }}>Guardar VIP</button>
+          </div>
+        </div>
+      )}
+
+      {/* GESTION DE ADMINS */}
+      {tab === "admins" && (
+        <div className="admin-seccion">
+          <div className="admin-lista">
+            {admins.map(a => (
+              <div key={a.id} className="admin-list-item">
+                <div><strong>{a.username || a.discord_id}</strong> · {a.discord_id}</div>
+                <div className="admin-list-desc">Agregado por: {a.agregado_por || "Sistema"}</div>
+                {a.discord_id !== discordId && (
+                  <button className="admin-btn-danger" onClick={() => ejecutarAccion("eliminar_admin", { discord_id: a.discord_id })}>Quitar Admin</button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="admin-form-crear">
+            <h4>Agregar Administrador</h4>
+            <input placeholder="Discord ID del nuevo admin" value={nuevoAdminId} onChange={e => setNuevoAdminId(e.target.value)} />
+            <button className="admin-btn" onClick={() => {
+              ejecutarAccion("agregar_admin", { discord_id: nuevoAdminId });
+              setNuevoAdminId("");
+            }}>Agregar Admin</button>
+          </div>
+        </div>
+      )}
+
+      {/* LOGS */}
+      {tab === "logs" && (
+        <div className="admin-seccion">
+          <div className="admin-logs">
+            {logs.map(l => (
+              <div key={l.id} className="admin-log-item">
+                <span className="admin-log-fecha">{new Date(l.created_at).toLocaleString("es-CL")}</span>
+                <span className="admin-log-accion">{l.accion}</span>
+                {l.detalles && <span className="admin-log-detalles">{l.detalles}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

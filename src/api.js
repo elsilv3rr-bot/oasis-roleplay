@@ -159,6 +159,260 @@ function cerrarSesion() {
   window.location.href = "/";
 }
 
+// OBTENER SALDO ACTUAL DEL PERSONAJE DESDE LA BASE DE DATOS //
+async function obtenerSaldoDB(slotNumber = 1) {
+  const token = getToken();
+  if (!token) return null;
+
+  try {
+    const res = await fetch(`${API_URL}/banco?slotNumber=${slotNumber}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    return typeof data.dinero === "number" ? data.dinero : null;
+  } catch {
+    return null;
+  }
+}
+
+// TRANSFERIR DINERO A OTRO PERSONAJE POR STATEID //
+async function transferirDineroDB(toStateId, amount, slotNumber = 1) {
+  const token = getToken();
+  if (!token) throw new Error("Sesion expirada. Inicia sesion de nuevo.");
+
+  const res = await fetch(`${API_URL}/banco`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ action: "transfer", toStateId, amount, slotNumber }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al realizar la transferencia");
+  return data;
+}
+
+// DEBITAR DINERO DEL PERSONAJE (COMPRAS, MULTAS, ETCETC) //
+async function debitarDineroDB(amount, slotNumber = 1) {
+  const token = getToken();
+  if (!token) throw new Error("Sesion expirada. Inicia sesion de nuevo.");
+
+  const res = await fetch(`${API_URL}/banco`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ action: "debit", amount, slotNumber }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al debitar dinero");
+  return data;
+}
+
+// ============ ADMIN API ============ //
+
+// Verificar si el usuario es admin //
+async function verificarAdmin() {
+  const token = getToken();
+  if (!token) return false;
+
+  try {
+    const res = await fetch(`${API_URL}/admin?accion=verificar`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    return data.esAdmin === true;
+  } catch {
+    return false;
+  }
+}
+
+// Obtener datos del panel admin //
+async function obtenerDatosAdmin(accion, params = "") {
+  const token = getToken();
+  if (!token) return null;
+
+  const res = await fetch(`${API_URL}/admin?accion=${accion}${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Error al obtener datos admin");
+  return data;
+}
+
+// Ejecutar accion admin //
+async function accionAdmin(payload) {
+  const token = getToken();
+  if (!token) throw new Error("Sesion expirada");
+
+  const res = await fetch(`${API_URL}/admin`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error en accion admin");
+  return data;
+}
+
+// ============ POLICIA API ============ //
+
+// Consulta policial //
+async function consultaPolicial(accion, params = "", slotNumber = 1) {
+  const token = getToken();
+  if (!token) return null;
+
+  const res = await fetch(
+    `${API_URL}/policia?accion=${accion}&slotNumber=${slotNumber}${params}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Error en consulta policial");
+  return data;
+}
+
+// Accion policial //
+async function accionPolicial(payload) {
+  const token = getToken();
+  if (!token) throw new Error("Sesion expirada");
+
+  const res = await fetch(`${API_URL}/policia`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error en accion policial");
+  return data;
+}
+
+// ============ RECOMPENSAS API ============ //
+
+// Obtener estado de recompensa diaria //
+async function obtenerRecompensaDiaria(slotNumber = 1) {
+  const token = getToken();
+  if (!token) return null;
+
+  const res = await fetch(`${API_URL}/recompensas?slotNumber=${slotNumber}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Error al consultar recompensa");
+  return data;
+}
+
+// Cobrar recompensa diaria //
+async function cobrarRecompensaDiaria(slotNumber = 1) {
+  const token = getToken();
+  if (!token) throw new Error("Sesion expirada");
+
+  const res = await fetch(`${API_URL}/recompensas?slotNumber=${slotNumber}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ slotNumber }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al cobrar recompensa");
+  return data;
+}
+
+// ============ VEHICULOS REGISTRO API ============ //
+
+// Registrar vehiculo legalmente //
+async function registrarVehiculoDB(nombreVehiculo, slotNumber = 1) {
+  const token = getToken();
+  if (!token) throw new Error("Sesion expirada");
+
+  const res = await fetch(`${API_URL}/vehiculos`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ nombre_vehiculo: nombreVehiculo, slotNumber }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al registrar vehiculo");
+  return data;
+}
+
+// ============ MULTAS API ============ //
+
+// Obtener multas pendientes //
+async function obtenerMultasDB(slotNumber = 1) {
+  const token = getToken();
+  if (!token) return { multas: [], cargos: [] };
+
+  const res = await fetch(`${API_URL}/multas?slotNumber=${slotNumber}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const data = await res.json();
+  if (!res.ok) return { multas: [], cargos: [] };
+  return data;
+}
+
+// Pagar multa //
+async function pagarMultaDB(multaId, slotNumber = 1) {
+  const token = getToken();
+  if (!token) throw new Error("Sesion expirada");
+
+  const res = await fetch(`${API_URL}/multas?slotNumber=${slotNumber}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ accion: "pagar_multa", multa_id: multaId, slotNumber }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al pagar multa");
+  return data;
+}
+
+// Pagar todas las multas //
+async function pagarTodasMultasDB(slotNumber = 1) {
+  const token = getToken();
+  if (!token) throw new Error("Sesion expirada");
+
+  const res = await fetch(`${API_URL}/multas?slotNumber=${slotNumber}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ accion: "pagar_todas", slotNumber }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al pagar multas");
+  return data;
+}
+
 export {
   getToken,
   setToken,
@@ -170,5 +424,19 @@ export {
   obtenerPersonaje,
   registrarPersonaje,
   cerrarSesion,
+  obtenerSaldoDB,
+  transferirDineroDB,
+  debitarDineroDB,
+  verificarAdmin,
+  obtenerDatosAdmin,
+  accionAdmin,
+  consultaPolicial,
+  accionPolicial,
+  obtenerRecompensaDiaria,
+  cobrarRecompensaDiaria,
+  registrarVehiculoDB,
+  obtenerMultasDB,
+  pagarMultaDB,
+  pagarTodasMultasDB,
 };
 

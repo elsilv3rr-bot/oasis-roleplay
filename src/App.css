@@ -2540,3 +2540,508 @@ body::after {
     grid-template-columns: 1fr;
   }
 }
+
+/* ================== BOTON ADMIN FLOTANTE ================== */
+.admin-flotante-btn {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 1000;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid rgba(168, 85, 247, 0.6);
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.5);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.admin-flotante-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 28px rgba(124, 58, 237, 0.7);
+}
+
+/* ================== RECOMPENSAS PANEL ================== */
+.recompensas-wrap {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+.recompensas-hero {
+  text-align: center;
+  color: white;
+}
+.recompensas-hero h2 {
+  font-size: 1.6rem;
+  margin: 8px 0 4px;
+  background: linear-gradient(90deg, #f97316, #fb923c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.recompensas-hero p {
+  color: rgba(255,255,255,0.6);
+  font-size: 0.85rem;
+}
+.recompensas-msg {
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  width: 100%;
+  max-width: 500px;
+  text-align: center;
+}
+.recompensas-msg.ok {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.recompensas-msg.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.recompensas-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  width: 100%;
+  max-width: 500px;
+}
+.recompensas-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+.recompensas-card-titulo {
+  color: rgba(255,255,255,0.5);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+.recompensas-card-valor {
+  color: #fb923c;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+.recompensas-card-total {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.15), rgba(251, 146, 60, 0.1));
+  border-color: rgba(249, 115, 22, 0.3);
+}
+.recompensas-card-total-valor {
+  color: #f97316;
+  font-size: 1.8rem;
+  font-weight: 800;
+}
+.recompensas-cobrar-btn {
+  padding: 14px 36px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f97316, #fb923c);
+  color: white;
+  font-weight: 800;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  letter-spacing: 0.5px;
+}
+.recompensas-cobrar-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(249, 115, 22, 0.4);
+}
+.recompensas-cobrar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.recompensas-saldo {
+  color: rgba(255,255,255,0.5);
+  font-size: 0.85rem;
+}
+.recompensas-saldo strong {
+  color: #34d399;
+}
+
+/* ================== POLICIA PANEL ================== */
+.policia-wrap {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.policia-hero {
+  text-align: center;
+  color: white;
+}
+.policia-hero h2 {
+  font-size: 1.5rem;
+  margin: 8px 0 4px;
+  background: linear-gradient(90deg, #3b82f6, #0ea5e9);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.policia-hero p {
+  color: rgba(255,255,255,0.6);
+  font-size: 0.85rem;
+}
+.policia-hero strong {
+  color: #60a5fa;
+}
+.policia-msg {
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+.policia-msg.ok {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.policia-msg.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.policia-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.policia-seccion {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.policia-seccion input,
+.policia-seccion select {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(5, 7, 20, 0.5);
+  color: white;
+  font-size: 0.9rem;
+}
+.policia-input-row {
+  display: flex;
+  gap: 10px;
+}
+.policia-input-row input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(5, 7, 20, 0.5);
+  color: white;
+}
+.policia-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #3b82f6, #0ea5e9);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+  white-space: nowrap;
+}
+.policia-btn:hover {
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+}
+.policia-resultado {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.policia-dato {
+  color: rgba(255,255,255,0.8);
+  font-size: 0.88rem;
+}
+.policia-dato strong {
+  color: #60a5fa;
+}
+.policia-resultado h4 {
+  color: #f97316;
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+.policia-multa-item,
+.policia-cargo-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 8px;
+  color: rgba(255,255,255,0.75);
+  font-size: 0.82rem;
+}
+.pagada { color: #34d399; }
+.pendiente { color: #f87171; }
+.gravedad-leve { color: #fbbf24; }
+.gravedad-moderado { color: #f97316; }
+.gravedad-grave { color: #ef4444; font-weight: 700; }
+
+/* ================== ADMIN PANEL ================== */
+.admin-wrap {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.admin-hero {
+  text-align: center;
+  color: white;
+}
+.admin-hero h2 {
+  font-size: 1.5rem;
+  margin: 8px 0;
+  background: linear-gradient(90deg, #7c3aed, #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.admin-msg {
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+.admin-msg.ok {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.admin-msg.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.admin-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tab-btn {
+  padding: 8px 16px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.5);
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: 0.2s;
+}
+.tab-btn:hover {
+  border-color: rgba(124, 58, 237, 0.4);
+  color: white;
+}
+.tab-btn.active {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.3), rgba(168, 85, 247, 0.2));
+  border-color: rgba(124, 58, 237, 0.5);
+  color: white;
+}
+.admin-seccion {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.admin-input-row {
+  display: flex;
+  gap: 10px;
+}
+.admin-input-row input,
+.admin-input-row select {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(5, 7, 20, 0.5);
+  color: white;
+  font-size: 0.88rem;
+}
+.admin-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+  white-space: nowrap;
+}
+.admin-btn:hover {
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4);
+}
+.admin-btn-danger {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: 0.2s;
+}
+.admin-btn-danger:hover {
+  background: rgba(239, 68, 68, 0.35);
+}
+.admin-usuarios-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.admin-user-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: 0.2s;
+  color: white;
+}
+.admin-user-card:hover {
+  border-color: rgba(124, 58, 237, 0.3);
+}
+.admin-user-card.selected {
+  border-color: #a855f7;
+  background: rgba(124, 58, 237, 0.1);
+}
+.admin-user-meta {
+  color: rgba(255,255,255,0.45);
+  font-size: 0.78rem;
+  margin-top: 4px;
+}
+.admin-acciones {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.admin-acciones h3 {
+  color: #a855f7;
+  font-size: 1rem;
+}
+.admin-accion-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.admin-accion-grupo h4 {
+  color: rgba(255,255,255,0.6);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.admin-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.admin-list-item {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: white;
+}
+.admin-list-item strong {
+  color: #a855f7;
+}
+.admin-list-desc {
+  color: rgba(255,255,255,0.4);
+  font-size: 0.78rem;
+}
+.admin-form-crear {
+  background: rgba(124, 58, 237, 0.06);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.admin-form-crear h4 {
+  color: #a855f7;
+  font-size: 0.9rem;
+}
+.admin-form-crear input {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(5, 7, 20, 0.5);
+  color: white;
+  font-size: 0.88rem;
+}
+.admin-logs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.admin-log-item {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.65);
+}
+.admin-log-fecha {
+  color: rgba(255,255,255,0.35);
+  min-width: 140px;
+}
+.admin-log-accion {
+  color: #a855f7;
+  font-weight: 600;
+}
+.admin-log-detalles {
+  color: rgba(255,255,255,0.45);
+  flex: 1;
+}
+
+/* ================== REGISTRO LEGAL VEHICULO ================== */
+.registro-legal-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255,255,255,0.75);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 8px 0;
+}
+.registro-legal-check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #7c3aed;
+}
+.registro-legal-total {
+  color: #fb923c;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
