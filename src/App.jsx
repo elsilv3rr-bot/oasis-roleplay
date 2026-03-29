@@ -2545,17 +2545,14 @@ function PoliciaPanel({ datos }) {
 /* ================== PANEL ADMINISTRATIVO ================== */
 function AdminPanel({ discordId }) {
   const [tab, setTab] = React.useState("usuarios");
-  const [busqueda, setBusqueda] = React.useState("");
-  const [usuarios, setUsuarios] = React.useState([]);
   const [profesiones, setProfesiones] = React.useState([]);
   const [admins, setAdmins] = React.useState([]);
   const [niveles, setNiveles] = React.useState([]);
   const [logs, setLogs] = React.useState([]);
   const [mensaje, setMensaje] = React.useState(null);
-  const [cargando, setCargando] = React.useState(false);
 
   // Campos de accion //
-  const [seleccionado, setSeleccionado] = React.useState(null);
+  const [stateidObjetivo, setStateidObjetivo] = React.useState("");
   const [cantidadDinero, setCantidadDinero] = React.useState("");
   const [cantidadDineroGlobal, setCantidadDineroGlobal] = React.useState("");
   const [operacionDineroGlobal, setOperacionDineroGlobal] = React.useState("agregar");
@@ -2576,18 +2573,6 @@ function AdminPanel({ discordId }) {
   const [nuevoVipRecompensa, setNuevoVipRecompensa] = React.useState("");
 
   const limpiarMensaje = () => setTimeout(() => setMensaje(null), 3000);
-
-  const cargarUsuarios = async () => {
-    setCargando(true);
-    try {
-      const data = await obtenerDatosAdmin("usuarios", busqueda ? `&busqueda=${encodeURIComponent(busqueda)}` : "");
-      setUsuarios(data.usuarios || []);
-    } catch (err) {
-      setMensaje({ tipo: "error", texto: err.message });
-    } finally {
-      setCargando(false);
-    }
-  };
 
   const cargarProfesiones = async () => {
     try {
@@ -2618,7 +2603,6 @@ function AdminPanel({ discordId }) {
   };
 
   React.useEffect(() => {
-    cargarUsuarios();
     cargarProfesiones();
     cargarAdmins();
     cargarNiveles();
@@ -2634,18 +2618,19 @@ function AdminPanel({ discordId }) {
       if (accion.includes("profesion")) cargarProfesiones();
       if (accion.includes("admin")) cargarAdmins();
       if (accion.includes("vip")) cargarNiveles();
-      if (
-        accion.includes("dinero") ||
-        accion.includes("dinero_global") ||
-        accion.includes("desbloquear_slot") ||
-        accion.includes("rol") ||
-        accion.includes("placa")
-      ) {
-        cargarUsuarios();
-      }
     } catch (err) {
       setMensaje({ tipo: "error", texto: err.message });
     }
+  };
+
+  const ejecutarAccionUsuario = (accion, payload = {}) => {
+    const stateid = stateidObjetivo.trim();
+    if (!stateid) {
+      setMensaje({ tipo: "error", texto: "Debes ingresar un stateID" });
+      return;
+    }
+
+    ejecutarAccion(accion, { stateid, ...payload });
   };
 
   return (
@@ -2680,9 +2665,18 @@ function AdminPanel({ discordId }) {
       {/* GESTION DE USUARIOS */}
       {tab === "usuarios" && (
         <div className="admin-seccion">
-          <div className="admin-input-row">
-            <input placeholder="Buscar por nombre, stateID o Discord ID" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-            <button className="admin-btn" onClick={cargarUsuarios} disabled={cargando}>Buscar</button>
+          <div className="admin-acciones">
+            <h3>Usuario Objetivo</h3>
+            <div className="admin-accion-grupo">
+              <h4>StateID</h4>
+              <div className="admin-input-row">
+                <input
+                  placeholder="Ingresa el stateID del usuario"
+                  value={stateidObjetivo}
+                  onChange={e => setStateidObjetivo(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="admin-acciones">
@@ -2704,80 +2698,68 @@ function AdminPanel({ discordId }) {
             </div>
           </div>
 
-          <div className="admin-usuarios-grid">
-            {usuarios.map(u => (
-              <div key={u.id} className={`admin-user-card ${seleccionado?.id === u.id ? "selected" : ""}`}
-                onClick={() => setSeleccionado(u)}>
-                <div><strong>{u.nombre}</strong> · {u.stateid}</div>
-                <div className="admin-user-meta">Rol: {u.rol} · VIP: {u.nivel_vip} · ${Number(u.dinero).toLocaleString()}</div>
-              </div>
-            ))}
-          </div>
+          <div className="admin-acciones">
+            <h3>Acciones por stateID</h3>
 
-          {seleccionado && (
-            <div className="admin-acciones">
-              <h3>Acciones sobre: {seleccionado.nombre} ({seleccionado.stateid})</h3>
-
-              <div className="admin-accion-grupo">
-                <h4>Dinero</h4>
-                <div className="admin-input-row">
-                  <select value={operacionDinero} onChange={e => setOperacionDinero(e.target.value)}>
-                    <option value="agregar">Agregar</option>
-                    <option value="quitar">Quitar</option>
-                  </select>
-                  <input type="number" placeholder="Cantidad" value={cantidadDinero} onChange={e => setCantidadDinero(e.target.value)} />
-                  <button className="admin-btn" onClick={() => {
-                    ejecutarAccion("modificar_dinero", { stateid: seleccionado.stateid, cantidad: cantidadDinero, operacion: operacionDinero });
-                    setCantidadDinero("");
-                  }}>Aplicar</button>
-                </div>
-              </div>
-
-              <div className="admin-accion-grupo">
-                <h4>Rol / Profesión</h4>
-                <div className="admin-input-row">
-                  <select value={rolAsignar} onChange={e => setRolAsignar(e.target.value)}>
-                    <option value="">Seleccionar rol</option>
-                    {profesiones.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-                  </select>
-                  <button className="admin-btn" onClick={() => { ejecutarAccion("asignar_rol", { stateid: seleccionado.stateid, rol: rolAsignar }); }}>Asignar</button>
-                </div>
-              </div>
-
-              <div className="admin-accion-grupo">
-                <h4>Placa Policial</h4>
-                <div className="admin-input-row">
-                  <input placeholder="N° de placa" value={placaAsignar} onChange={e => setPlacaAsignar(e.target.value)} />
-                  <button className="admin-btn" onClick={() => { ejecutarAccion("asignar_placa", { stateid: seleccionado.stateid, placa: placaAsignar }); setPlacaAsignar(""); }}>Asignar Placa</button>
-                </div>
-              </div>
-
-              <div className="admin-accion-grupo">
-                <h4>Nivel VIP</h4>
-                <div className="admin-input-row">
-                  <select value={vipAsignar} onChange={e => setVipAsignar(e.target.value)}>
-                    <option value="">Seleccionar VIP</option>
-                    {niveles.map(n => <option key={n.id} value={n.nombre}>{n.nombre} (+${n.recompensa_diaria})</option>)}
-                  </select>
-                  <button className="admin-btn" onClick={() => { ejecutarAccion("asignar_vip", { stateid: seleccionado.stateid, nivel: vipAsignar }); }}>Asignar VIP</button>
-                </div>
-              </div>
-
-              <div className="admin-accion-grupo">
-                <h4>Desbloquear Slots</h4>
-                <div className="admin-input-row">
-                  <select value={slotDesbloquear} onChange={e => setSlotDesbloquear(e.target.value)}>
-                    <option value="2">Slot 2</option>
-                    <option value="3">Slot 3</option>
-                    <option value="4">Slot 4</option>
-                  </select>
-                  <button className="admin-btn" onClick={() => {
-                    ejecutarAccion("desbloquear_slot_usuario", { stateid: seleccionado.stateid, slotNumber: Number(slotDesbloquear) });
-                  }}>Desbloquear Slot</button>
-                </div>
+            <div className="admin-accion-grupo">
+              <h4>Dinero</h4>
+              <div className="admin-input-row">
+                <select value={operacionDinero} onChange={e => setOperacionDinero(e.target.value)}>
+                  <option value="agregar">Agregar</option>
+                  <option value="quitar">Quitar</option>
+                </select>
+                <input type="number" placeholder="Cantidad" value={cantidadDinero} onChange={e => setCantidadDinero(e.target.value)} />
+                <button className="admin-btn" onClick={() => {
+                  ejecutarAccionUsuario("modificar_dinero", { cantidad: cantidadDinero, operacion: operacionDinero });
+                  setCantidadDinero("");
+                }}>Aplicar</button>
               </div>
             </div>
-          )}
+
+            <div className="admin-accion-grupo">
+              <h4>Rol / Profesión</h4>
+              <div className="admin-input-row">
+                <select value={rolAsignar} onChange={e => setRolAsignar(e.target.value)}>
+                  <option value="">Seleccionar rol</option>
+                  {profesiones.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                </select>
+                <button className="admin-btn" onClick={() => { ejecutarAccionUsuario("asignar_rol", { rol: rolAsignar }); }}>Asignar</button>
+              </div>
+            </div>
+
+            <div className="admin-accion-grupo">
+              <h4>Placa Policial</h4>
+              <div className="admin-input-row">
+                <input placeholder="N° de placa" value={placaAsignar} onChange={e => setPlacaAsignar(e.target.value)} />
+                <button className="admin-btn" onClick={() => { ejecutarAccionUsuario("asignar_placa", { placa: placaAsignar }); setPlacaAsignar(""); }}>Asignar Placa</button>
+              </div>
+            </div>
+
+            <div className="admin-accion-grupo">
+              <h4>Nivel VIP</h4>
+              <div className="admin-input-row">
+                <select value={vipAsignar} onChange={e => setVipAsignar(e.target.value)}>
+                  <option value="">Seleccionar VIP</option>
+                  {niveles.map(n => <option key={n.id} value={n.nombre}>{n.nombre} (+${n.recompensa_diaria})</option>)}
+                </select>
+                <button className="admin-btn" onClick={() => { ejecutarAccionUsuario("asignar_vip", { nivel: vipAsignar }); }}>Asignar VIP</button>
+              </div>
+            </div>
+
+            <div className="admin-accion-grupo">
+              <h4>Desbloquear Slots</h4>
+              <div className="admin-input-row">
+                <select value={slotDesbloquear} onChange={e => setSlotDesbloquear(e.target.value)}>
+                  <option value="2">Slot 2</option>
+                  <option value="3">Slot 3</option>
+                  <option value="4">Slot 4</option>
+                </select>
+                <button className="admin-btn" onClick={() => {
+                  ejecutarAccionUsuario("desbloquear_slot_usuario", { slotNumber: Number(slotDesbloquear) });
+                }}>Desbloquear Slot</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
