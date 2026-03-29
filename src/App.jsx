@@ -2557,6 +2557,8 @@ function AdminPanel({ discordId }) {
   // Campos de accion //
   const [seleccionado, setSeleccionado] = React.useState(null);
   const [cantidadDinero, setCantidadDinero] = React.useState("");
+  const [cantidadDineroGlobal, setCantidadDineroGlobal] = React.useState("");
+  const [operacionDineroGlobal, setOperacionDineroGlobal] = React.useState("agregar");
   const [operacionDinero, setOperacionDinero] = React.useState("agregar");
   const [rolAsignar, setRolAsignar] = React.useState("");
   const [placaAsignar, setPlacaAsignar] = React.useState("");
@@ -2631,7 +2633,14 @@ function AdminPanel({ discordId }) {
       if (accion.includes("profesion")) cargarProfesiones();
       if (accion.includes("admin")) cargarAdmins();
       if (accion.includes("vip")) cargarNiveles();
-      if (accion.includes("dinero") || accion.includes("rol") || accion.includes("placa")) cargarUsuarios();
+      if (
+        accion.includes("dinero") ||
+        accion.includes("dinero_global") ||
+        accion.includes("rol") ||
+        accion.includes("placa")
+      ) {
+        cargarUsuarios();
+      }
     } catch (err) {
       setMensaje({ tipo: "error", texto: err.message });
     }
@@ -2672,6 +2681,25 @@ function AdminPanel({ discordId }) {
           <div className="admin-input-row">
             <input placeholder="Buscar por nombre, stateID o Discord ID" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
             <button className="admin-btn" onClick={cargarUsuarios} disabled={cargando}>Buscar</button>
+          </div>
+
+          <div className="admin-acciones">
+            <h3>Economía Global</h3>
+            <div className="admin-accion-grupo">
+              <h4>Aplicar a todos los stateID</h4>
+              <div className="admin-input-row">
+                <select value={operacionDineroGlobal} onChange={e => setOperacionDineroGlobal(e.target.value)}>
+                  <option value="agregar">Agregar</option>
+                  <option value="quitar">Quitar</option>
+                </select>
+                <input type="number" placeholder="Cantidad" value={cantidadDineroGlobal} onChange={e => setCantidadDineroGlobal(e.target.value)} />
+                <button className="admin-btn" onClick={() => {
+                  ejecutarAccion("modificar_dinero_global", { cantidad: cantidadDineroGlobal, operacion: operacionDineroGlobal });
+                  setCantidadDineroGlobal("");
+                }}>Aplicar a todos</button>
+              </div>
+              <div className="admin-accion-ayuda">Esta acción solo se permite desde el panel web administrativo.</div>
+            </div>
           </div>
 
           <div className="admin-usuarios-grid">

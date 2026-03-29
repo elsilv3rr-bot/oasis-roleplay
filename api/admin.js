@@ -14,6 +14,16 @@ function parseBody(body) {
   return body;
 }
 
+function esPeticionWebAdmin(req, body) {
+  const host = String(req.headers.host || "").trim().toLowerCase();
+  const origin = String(req.headers.origin || "").trim().toLowerCase();
+  const referer = String(req.headers.referer || "").trim().toLowerCase();
+  const marcaWeb = body?.webAdmin === true;
+
+  if (!host || !marcaWeb) return false;
+  return origin.includes(host) || referer.includes(host);
+}
+
 // Verificar que el discord_id es admin //
 async function esAdmin(connection, discordId) {
   const [rows] = await connection.execute(
@@ -159,6 +169,62 @@ export default async function handler(req, res) {
       );
 
       return res.status(200).json({ ok: true, dinero: nuevo });
+    }
+
+    // Modificar dinero global a todos los stateID (solo web) //
+    if (accion === "modificar_dinero_global") {
+      if (!esPeticionWebAdmin(req, body)) {
+        return res.status(403).json({ error: "Accion permitida solo desde el panel web" });
+      }
+
+      const { cantidad, operacion } = body;
+      const monto = Math.floor(Number(cantidad));
+      if (!monto || monto <= 0) return res.status(400).json({ error: "Cantidad invalida" });
+
+      await connection.beginTransaction();
+
+      const [beforeRows] = await connection.execute(
+        "SELECT COUNT(*) AS total, COALESCE(SUM(dinero), 0) AS suma FROM usuarios"
+      );
+
+      let updateResult;
+      if (operacion === "quitar") {
+        [updateResult] = await connection.execute(
+          "UPDATE usuarios SET dinero = GREATEST(0, dinero - ?)"
+          , [monto]
+        );
+      } else {
+        [updateResult] = await connection.execute(
+          "UPDATE usuarios SET dinero = dinero + ?"
+          , [monto]
+        );
+      }
+
+      const [afterRows] = await connection.execute(
+        "SELECT COUNT(*) AS total, COALESCE(SUM(dinero), 0) AS suma FROM usuarios"
+      );
+
+      await connection.commit();
+
+      const antes = Number(beforeRows[0]?.suma || 0);
+      const despues = Number(afterRows[0]?.suma || 0);
+      const totalUsuarios = Number(afterRows[0]?.total || 0);
+
+      await registrarLogAdmin(
+        connection,
+        decoded.discordId,
+        `${operacion === "quitar" ? "Quito" : "Agrego"} $${monto} global`,
+        null,
+        `Usuarios: ${totalUsuarios}, Total antes: $${antes}, Total despues: $${despues}`
+      );
+
+      return res.status(200).json({
+        ok: true,
+        afectados: updateResult?.affectedRows || 0,
+        totalUsuarios,
+        totalAntes: antes,
+        totalDespues: despues,
+      });
     }
 
     // Asignar rol/profesion //

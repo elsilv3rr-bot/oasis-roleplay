@@ -2544,8 +2544,8 @@ body::after {
 /* ================== BOTON ADMIN FLOTANTE ================== */
 .admin-flotante-btn {
   position: fixed;
-  bottom: 20px;
-  left: 20px;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  left: calc(14px + env(safe-area-inset-left, 0px));
   z-index: 1000;
   width: 48px;
   height: 48px;
@@ -2951,6 +2951,11 @@ body::after {
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.admin-accion-ayuda {
+  color: rgba(255,255,255,0.52);
+  font-size: 0.78rem;
 }
 .admin-lista {
   display: flex;
