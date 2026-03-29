@@ -2560,6 +2560,7 @@ function AdminPanel({ discordId }) {
   const [cantidadDineroGlobal, setCantidadDineroGlobal] = React.useState("");
   const [operacionDineroGlobal, setOperacionDineroGlobal] = React.useState("agregar");
   const [operacionDinero, setOperacionDinero] = React.useState("agregar");
+  const [slotDesbloquear, setSlotDesbloquear] = React.useState("2");
   const [rolAsignar, setRolAsignar] = React.useState("");
   const [placaAsignar, setPlacaAsignar] = React.useState("");
   const [vipAsignar, setVipAsignar] = React.useState("");
@@ -2636,6 +2637,7 @@ function AdminPanel({ discordId }) {
       if (
         accion.includes("dinero") ||
         accion.includes("dinero_global") ||
+        accion.includes("desbloquear_slot") ||
         accion.includes("rol") ||
         accion.includes("placa")
       ) {
@@ -2758,6 +2760,20 @@ function AdminPanel({ discordId }) {
                     {niveles.map(n => <option key={n.id} value={n.nombre}>{n.nombre} (+${n.recompensa_diaria})</option>)}
                   </select>
                   <button className="admin-btn" onClick={() => { ejecutarAccion("asignar_vip", { stateid: seleccionado.stateid, nivel: vipAsignar }); }}>Asignar VIP</button>
+                </div>
+              </div>
+
+              <div className="admin-accion-grupo">
+                <h4>Desbloquear Slots</h4>
+                <div className="admin-input-row">
+                  <select value={slotDesbloquear} onChange={e => setSlotDesbloquear(e.target.value)}>
+                    <option value="2">Slot 2</option>
+                    <option value="3">Slot 3</option>
+                    <option value="4">Slot 4</option>
+                  </select>
+                  <button className="admin-btn" onClick={() => {
+                    ejecutarAccion("desbloquear_slot_usuario", { stateid: seleccionado.stateid, slotNumber: Number(slotDesbloquear) });
+                  }}>Desbloquear Slot</button>
                 </div>
               </div>
             </div>

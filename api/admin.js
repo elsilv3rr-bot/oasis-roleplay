@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import { crearConexion, cerrarConexion } from "./_lib/database.js";
 import { aplicarHeaders } from "./_lib/seguridad.js";
 import { sanitizar } from "./_lib/validacion.js";
+import { ensureUserSlotsInitialized, parseSlotNumber } from "./_lib/characterSlots.js";
 
 function parseBody(body) {
   if (!body) return {};
@@ -225,6 +226,66 @@ export default async function handler(req, res) {
         totalAntes: antes,
         totalDespues: despues,
       });
+    }
+
+    // Desbloquear slot de personaje para un usuario //
+    if (accion === "desbloquear_slot_usuario") {
+      const { stateid, slotNumber } = body;
+      if (!stateid) return res.status(400).json({ error: "stateid requerido" });
+
+      const slot = parseSlotNumber(slotNumber);
+      if (!slot || slot === 1) {
+        return res.status(400).json({ error: "Slot invalido para desbloqueo administrativo" });
+      }
+
+      const [targetRows] = await connection.execute(
+        "SELECT discord_id FROM usuarios WHERE stateid = ? LIMIT 1",
+        [sanitizar(stateid)]
+      );
+
+      if (targetRows.length === 0) {
+        return res.status(404).json({ error: "Personaje no encontrado" });
+      }
+
+      const targetDiscordId = String(targetRows[0].discord_id || "").trim();
+      if (!targetDiscordId) {
+        return res.status(400).json({ error: "El usuario no tiene discord_id valido" });
+      }
+
+      await ensureUserSlotsInitialized(connection, targetDiscordId);
+
+      const [slotRows] = await connection.execute(
+        `SELECT is_unlocked
+         FROM user_character_slots
+         WHERE discord_id = ? AND slot_number = ?
+         LIMIT 1`,
+        [targetDiscordId, slot]
+      );
+
+      if (slotRows.length === 0) {
+        return res.status(404).json({ error: "Slot no encontrado" });
+      }
+
+      if (slotRows[0].is_unlocked === 1) {
+        return res.status(200).json({ ok: true, yaDesbloqueado: true, slotNumber: slot });
+      }
+
+      await connection.execute(
+        `UPDATE user_character_slots
+         SET is_unlocked = 1, unlocked_at = NOW()
+         WHERE discord_id = ? AND slot_number = ?`,
+        [targetDiscordId, slot]
+      );
+
+      await registrarLogAdmin(
+        connection,
+        decoded.discordId,
+        `Desbloqueo slot ${slot} de ${stateid}`,
+        targetDiscordId,
+        `Desbloqueo manual desde panel admin web`
+      );
+
+      return res.status(200).json({ ok: true, slotNumber: slot, discordId: targetDiscordId });
     }
 
     // Asignar rol/profesion //
