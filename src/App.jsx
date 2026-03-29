@@ -1,16 +1,234 @@
 import React from "react"
 import { useState, useEffect } from "react"
-import { Routes, Route, useNavigate } from "react-router-dom"
-import { supabase } from "./supabase"
+import { Routes, Route, useNavigate, useSearchParams } from "react-router-dom"
+import { iniciarLoginDiscord, obtenerSlotsPersonajes, desbloquearSlotPersonaje, obtenerUsuario, registrarPersonaje, setToken, cerrarSesion } from "./api"
 import "./App.css"
 
-const START_MONEY = 20000;
+function AppIcon({ name, size = 20, className = "" }) {
+  const iconProps = {
+    className: ["app-icon", className].filter(Boolean).join(" "),
+    viewBox: "0 0 24 24",
+    width: size,
+    height: size,
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "1.8",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": "true",
+    focusable: "false",
+  };
+
+  switch (name) {
+    case "discord":
+      return (
+        <svg className={["app-icon", className].filter(Boolean).join(" ")} viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" focusable="false">
+          <path fill="currentColor" d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
+        </svg>
+      );
+    case "id-card":
+      return (
+        <svg {...iconProps}>
+          <rect x="3" y="6" width="18" height="12" rx="2.5" />
+          <circle cx="8" cy="12" r="2.2" />
+          <path d="M13 10h4" />
+          <path d="M13 13h5" />
+        </svg>
+      );
+    case "card":
+      return (
+        <svg {...iconProps}>
+          <rect x="3" y="6" width="18" height="12" rx="2.5" />
+          <path d="M3 10.5h18" />
+          <path d="M7 15h3" />
+        </svg>
+      );
+    case "box":
+      return (
+        <svg {...iconProps}>
+          <path d="M12 3 4 7v10l8 4 8-4V7l-8-4Z" />
+          <path d="M4 7l8 4 8-4" />
+          <path d="M12 11v10" />
+        </svg>
+      );
+    case "receipt":
+      return (
+        <svg {...iconProps}>
+          <path d="M7 3h10v18l-2-1.5L13 21l-2-1.5L9 21l-2-1.5L5 21V5a2 2 0 0 1 2-2Z" />
+          <path d="M9 8h6" />
+          <path d="M9 12h6" />
+          <path d="M9 16h4" />
+        </svg>
+      );
+    case "store":
+      return (
+        <svg {...iconProps}>
+          <path d="M4 10h16" />
+          <path d="M5 10l1.5-5h11L19 10" />
+          <path d="M6 10v9h12v-9" />
+          <path d="M10 19v-5h4v5" />
+        </svg>
+      );
+    case "chip":
+      return (
+        <svg {...iconProps}>
+          <rect x="7" y="7" width="10" height="10" rx="2" />
+          <path d="M9 3v4" />
+          <path d="M15 3v4" />
+          <path d="M9 17v4" />
+          <path d="M15 17v4" />
+          <path d="M3 9h4" />
+          <path d="M3 15h4" />
+          <path d="M17 9h4" />
+          <path d="M17 15h4" />
+        </svg>
+      );
+    case "eye":
+      return (
+        <svg {...iconProps}>
+          <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z" />
+          <circle cx="12" cy="12" r="2.5" />
+        </svg>
+      );
+    case "eye-off":
+      return (
+        <svg {...iconProps}>
+          <path d="M3 3l18 18" />
+          <path d="M10.6 6.3A11.8 11.8 0 0 1 12 6c6.5 0 10 6 10 6a17.6 17.6 0 0 1-3.2 3.9" />
+          <path d="M6.7 6.8A17.5 17.5 0 0 0 2 12s3.5 6 10 6c1.6 0 3-.3 4.3-.8" />
+          <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+        </svg>
+      );
+    case "briefcase":
+      return (
+        <svg {...iconProps}>
+          <rect x="3" y="7" width="18" height="12" rx="2.5" />
+          <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7" />
+          <path d="M3 12h18" />
+        </svg>
+      );
+    case "send":
+      return (
+        <svg {...iconProps}>
+          <path d="M21 3 10 14" />
+          <path d="m21 3-7 18-4-7-7-4 18-7Z" />
+        </svg>
+      );
+    case "copy":
+      return (
+        <svg {...iconProps}>
+          <rect x="9" y="9" width="10" height="11" rx="2" />
+          <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
+        </svg>
+      );
+    case "user-plus":
+      return (
+        <svg {...iconProps}>
+          <circle cx="10" cy="8" r="3" />
+          <path d="M4 18a6 6 0 0 1 12 0" />
+          <path d="M19 8v6" />
+          <path d="M16 11h6" />
+        </svg>
+      );
+    case "close":
+      return (
+        <svg {...iconProps}>
+          <path d="M6 6l12 12" />
+          <path d="M18 6 6 18" />
+        </svg>
+      );
+    case "car":
+      return (
+        <svg {...iconProps}>
+          <path d="M5 16h14" />
+          <path d="m7 16 1.5-5h7L17 16" />
+          <path d="M6 16v2" />
+          <path d="M18 16v2" />
+          <circle cx="8" cy="16" r="1.5" />
+          <circle cx="16" cy="16" r="1.5" />
+        </svg>
+      );
+    case "document":
+      return (
+        <svg {...iconProps}>
+          <path d="M8 3h6l4 4v14H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />
+          <path d="M14 3v4h4" />
+          <path d="M10 12h6" />
+          <path d="M10 16h6" />
+        </svg>
+      );
+    case "backpack":
+      return (
+        <svg {...iconProps}>
+          <path d="M8 8V6a4 4 0 0 1 8 0v2" />
+          <rect x="5" y="8" width="14" height="12" rx="3" />
+          <path d="M9 12h6" />
+          <path d="M8 8h8" />
+        </svg>
+      );
+    case "arrow-left":
+      return (
+        <svg {...iconProps}>
+          <path d="M19 12H5" />
+          <path d="m12 19-7-7 7-7" />
+        </svg>
+      );
+    case "money":
+      return (
+        <svg {...iconProps}>
+          <circle cx="12" cy="12" r="8" />
+          <path d="M12 8v8" />
+          <path d="M9.5 10.5c0-1.1 1.1-2 2.5-2s2.5.9 2.5 2-1.1 2-2.5 2-2.5.9-2.5 2 1.1 2 2.5 2 2.5-.9 2.5-2" />
+        </svg>
+      );
+    case "scale":
+      return (
+        <svg {...iconProps}>
+          <path d="M12 4v16" />
+          <path d="M7 7h10" />
+          <path d="m7 7-3 5h6L7 7Z" />
+          <path d="m17 7-3 5h6l-3-5Z" />
+          <path d="M8 20h8" />
+        </svg>
+      );
+    case "check":
+      return (
+        <svg {...iconProps}>
+          <path d="m5 12 4 4L19 6" />
+        </svg>
+      );
+    case "lock":
+      return (
+        <svg {...iconProps}>
+          <rect x="5" y="11" width="14" height="10" rx="2" />
+          <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+        </svg>
+      );
+    case "gun":
+      return (
+        <svg {...iconProps}>
+          <path d="M4 10h8l5-3v4l-3 1 1 3h-3l-1-3H8v3H4Z" />
+        </svg>
+      );
+    case "cart":
+      return (
+        <svg {...iconProps}>
+          <circle cx="9" cy="19" r="1.5" />
+          <circle cx="17" cy="19" r="1.5" />
+          <path d="M3 5h2l2.3 9.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20 8H7" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
 
 /* ================== APP ================== */
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/registro" element={<Registro />} />
       <Route path="/expediente" element={<Expediente />} />
     </Routes>
@@ -20,12 +238,31 @@ export default function App() {
 /* ================== HOME ================== */
 function Home() {
   const navigate = useNavigate();
+  const [error, setError] = React.useState("");
 
-  const usuarioGuardado = localStorage.getItem("usuario");
+  // VERIFICAR SI YA ESTA AUTENTICADO //
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error")) {
+      setError("Error al iniciar sesion con Discord. Intenta de nuevo.");
+    }
 
+    const verificar = async () => {
+      const user = await obtenerUsuario();
+      if (user) {
+        // GUARDAR DATOS DE DISCORD EN LOCALSTORAGE //
+        localStorage.setItem("discord_user", JSON.stringify(user));
+
+        // Siempre se redirige al selector para soportar multiples personajes //
+        navigate("/registro");
+      }
+    };
+    verificar();
+  }, [navigate]);
+
+  // INICIAR SESION CON DISCORD //
   const entrar = () => {
-    if (usuarioGuardado) navigate("/expediente");
-    else navigate("/registro");
+    iniciarLoginDiscord();
   };
 
 return (
@@ -42,8 +279,18 @@ return (
       <div className="home-card">
         <h1>¡BIENVENIDO A OASIS ROLEPLAY!</h1>
 
-        <button className="home-btn" onClick={entrar}>
-          Ingresar
+        {error && <div className="discord-error">{error}</div>}
+
+        <button className="discord-btn" onClick={entrar}>
+          <span className="discord-icon-wrap" aria-hidden="true">
+            <svg className="discord-login-icon" viewBox="0 0 24 24" role="img" focusable="false">
+              <path
+                fill="currentColor"
+                d="M17.54 7.18a12.05 12.05 0 0 0-2.8-.9l-.14.28a8.4 8.4 0 0 0-3.2 0l-.14-.28c-.98.16-1.92.46-2.8.9A10.67 10.67 0 0 0 6.3 15.3c.87.63 1.84 1.09 2.87 1.36l.4-.66c-.47-.17-.92-.39-1.34-.65.11-.09.22-.19.33-.29 2.26 1.06 4.62 1.06 6.88 0 .11.1.22.2.33.29-.42.26-.87.48-1.34.65l.4.66a10.2 10.2 0 0 0 2.87-1.36 10.67 10.67 0 0 0-2.16-8.12Zm-6.53 6.46a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4Zm3.98 0a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4Z"
+              />
+            </svg>
+          </span>
+          Iniciar con Discord
         </button>
 
       </div>
@@ -54,95 +301,280 @@ return (
 );
 }
 
+/* AUTH CALLBACK  */
+// Recibe jwt desde url despues de Discord OAuth //
+function AuthCallback() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  React.useEffect(() => {
+    const token = searchParams.get("token");
+
+    if (!token) {
+      navigate("/?error=sin_token");
+      return;
+    }
+
+    // GUARDAR TOKEN Y VERIFICAR USUARIO //
+    setToken(token);
+
+    const verificar = async () => {
+      const user = await obtenerUsuario();
+      if (user) {
+        localStorage.setItem("discord_user", JSON.stringify(user));
+        // Siempre se muestra el selector de slots tras autenticacion.
+        navigate("/registro");
+      } else {
+        navigate("/?error=token_invalido");
+      }
+    };
+
+    verificar();
+  }, [navigate, searchParams]);
+
+  return (
+    <div className="registro-container">
+      <div className="registro-card" style={{ textAlign: "center" }}>
+        <h2>Autenticando...</h2>
+        <p>Conectando con Discord...</p>
+      </div>
+    </div>
+  );
+}
+
 /* ================== REGISTRO ================== */
 function Registro() {
   const navigate = useNavigate();
 
-  React.useEffect(() => {
-    const usuarioGuardado = localStorage.getItem("usuario");
-    if (usuarioGuardado) navigate("/expediente");
-  }, [navigate]);
-
+  const [slots, setSlots] = React.useState([]);
+  const [loadingSlots, setLoadingSlots] = React.useState(true);
+  const [selectedSlot, setSelectedSlot] = React.useState(1);
   const [nombre, setNombre] = React.useState("");
   const [edad, setEdad] = React.useState("");
   const [nacionalidad, setNacionalidad] = React.useState("");
+  const [feedback, setFeedback] = React.useState(null);
+  const [savingCharacter, setSavingCharacter] = React.useState(false);
+  const [unlockingSlot, setUnlockingSlot] = React.useState(null);
 
-const enviarDatos = async () => {
-    if (!nombre || !edad || !nacionalidad) {
-      alert("Completa todos los campos");
+  // Carga inicial: valida sesion y obtiene slots/personajes disponibles //
+  React.useEffect(() => {
+    const cargarDatos = async () => {
+      try {
+        const user = await obtenerUsuario();
+        if (!user) {
+          navigate("/");
+          return;
+        }
+
+        localStorage.setItem("discord_user", JSON.stringify(user));
+
+        const slotsResult = await obtenerSlotsPersonajes();
+        const loadedSlots = Array.isArray(slotsResult.slots) ? slotsResult.slots : [];
+        setSlots(loadedSlots);
+
+        // Se selecciona por defecto el primer slot libre/desbloqueado //
+        const firstEmptyUnlocked = loadedSlots.find((slot) => slot.isUnlocked && !slot.character);
+        const firstUnlocked = loadedSlots.find((slot) => slot.isUnlocked);
+        if (firstEmptyUnlocked) {
+          setSelectedSlot(firstEmptyUnlocked.slotNumber);
+        } else if (firstUnlocked) {
+          setSelectedSlot(firstUnlocked.slotNumber);
+        }
+      } catch (error) {
+        setFeedback({ type: "error", text: error.message || "No se pudieron cargar los slots" });
+      } finally {
+        setLoadingSlots(false);
+      }
+    };
+
+    cargarDatos();
+  }, [navigate]);
+
+  //  StateID de 4 digitos para registro inicial del personaje //
+  const generarStateID = React.useCallback(() => {
+    const numero = Math.floor(1000 + Math.random() * 9000);
+    return numero.toString().padStart(4, "0");
+  }, []);
+
+  // activo para mantener compatibilidad con la pantalla de expediente //
+  const seleccionarPersonaje = React.useCallback((character) => {
+    localStorage.setItem("usuario", JSON.stringify(character));
+    localStorage.setItem("active_slot_number", String(character.slotNumber));
+    navigate("/expediente");
+  }, [navigate]);
+
+  const selectedSlotData = React.useMemo(
+    () => slots.find((slot) => slot.slotNumber === selectedSlot) || null,
+    [slots, selectedSlot]
+  );
+
+  // refresh slots despues de crear personaje o desbloquear slot //
+  const recargarSlots = React.useCallback(async () => {
+    const slotsResult = await obtenerSlotsPersonajes();
+    setSlots(Array.isArray(slotsResult.slots) ? slotsResult.slots : []);
+    return slotsResult;
+  }, []);
+
+  const enviarDatos = async () => {
+    if (!selectedSlotData || !selectedSlotData.isUnlocked) {
+      setFeedback({ type: "error", text: "Debes seleccionar un slot desbloqueado" });
       return;
     }
 
-    // Generar StateID aleatoria 0001 - 9999
-function generarStateID() {
-  const numero = Math.floor(1000 + Math.random() * 9000);
-  return numero.toString().padStart(4, "0");
-}
+    if (selectedSlotData.character) {
+      setFeedback({ type: "error", text: "Este slot ya tiene un personaje" });
+      return;
+    }
 
-    const datos = {
-  nombre,
-  edad,
-  nacionalidad,
-  rol: "civil",
-  stateId: generarStateID(),
-};
+    if (!nombre || !edad || !nacionalidad) {
+      setFeedback({ type: "error", text: "Completa todos los campos para crear el personaje" });
+      return;
+    }
 
-console.log("Insertando usuario:", datos)
+    setSavingCharacter(true);
+    setFeedback(null);
 
-const { data, error } = await supabase
-  .from("usuarios")
-  .insert({
-  stateid: datos.stateId,
-  nombre: datos.nombre,
-  edad: datos.edad,
-  nacionalidad: datos.nacionalidad,
-  rol: datos.rol,
-  dinero: START_MONEY
-})
+    try {
+      const result = await registrarPersonaje({
+        slotNumber: selectedSlot,
+        stateId: generarStateID(),
+        nombre,
+        edad,
+        nacionalidad,
+        rol: "civil",
+      });
 
-if (error) {
-  console.error("Error insertando usuario:", error)
-} else {
-  console.log("Usuario guardado en DB:", data)
-}
+      await recargarSlots();
 
-    const jugadores = JSON.parse(localStorage.getItem("jugadores")) || [];
+      if (result?.character) {
+        setFeedback({ type: "success", text: "Personaje creado correctamente. Ingresando..." });
+        seleccionarPersonaje(result.character);
+        return;
+      }
 
-if (!jugadores.includes(nombre)) {
-  jugadores.push(nombre);
-  localStorage.setItem("jugadores", JSON.stringify(jugadores));
-}
+      setFeedback({ type: "success", text: "Personaje creado correctamente" });
+    } catch (error) {
+      setFeedback({ type: "error", text: error.message || "No se pudo crear el personaje" });
+    } finally {
+      setSavingCharacter(false);
+    }
+  };
 
-    localStorage.setItem("usuario", JSON.stringify(datos));
-    localStorage.setItem(`multas_${nombre}`, JSON.stringify([]));
+  // Compra de slot con feedback inmediato de exito o error //
+  const desbloquearSlot = async (slotNumber) => {
+    setUnlockingSlot(slotNumber);
+    setFeedback(null);
 
-    navigate("/expediente");
+    try {
+      const result = await desbloquearSlotPersonaje(slotNumber);
+      setSlots(Array.isArray(result.slots) ? result.slots : []);
+      setSelectedSlot(slotNumber);
+      setFeedback({ type: "success", text: result.message || `Slot ${slotNumber} desbloqueado` });
+    } catch (error) {
+      setFeedback({ type: "error", text: error.message || "No se pudo desbloquear el slot" });
+    } finally {
+      setUnlockingSlot(null);
+    }
   };
 
   return (
     <div className="registro-container">
-      <div className="registro-card">
-        <h2>REGISTRO DE PERSONAJE</h2>
+      <div className="registro-card registro-card-wide">
+        <h2>SLOTS DE PERSONAJE</h2>
+        <p className="registro-subtitle">Selecciona o desbloquea un slot para jugar.</p>
 
-        <input
-          type="text"
-          placeholder="Nombre"
-          onChange={(e) => setNombre(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="Edad"
-          onChange={(e) => setEdad(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="Nacionalidad"
-          onChange={(e) => setNacionalidad(e.target.value)}
-        />
+        {feedback && (
+          <div className={`registro-feedback ${feedback.type === "success" ? "ok" : "error"}`}>
+            {feedback.text}
+          </div>
+        )}
 
-        <button className="portal-button" onClick={enviarDatos}>
-          Finalizar Registro
-        </button>
+        <div className="character-slots-grid">
+          {loadingSlots && <div className="slot-loading">Cargando slots...</div>}
+
+          {!loadingSlots && slots.map((slot) => {
+            const isCurrentSelection = selectedSlot === slot.slotNumber;
+
+            if (!slot.isUnlocked) {
+              return (
+                <div key={slot.slotNumber} className="slot-card locked">
+                  <div className="slot-header">
+                    <span>Slot {slot.slotNumber}</span>
+                    <AppIcon name="lock" size={16} />
+                  </div>
+                  <p className="slot-price">Precio: ${slot.unlockCost.toLocaleString("es-CL")}</p>
+                  <button
+                    className="portal-button"
+                    onClick={() => desbloquearSlot(slot.slotNumber)}
+                    disabled={unlockingSlot === slot.slotNumber}
+                  >
+                    {unlockingSlot === slot.slotNumber ? "Desbloqueando..." : "Desbloquear"}
+                  </button>
+                </div>
+              );
+            }
+
+            if (slot.character) {
+              return (
+                <div key={slot.slotNumber} className={`slot-card ${isCurrentSelection ? "active" : ""}`}>
+                  <div className="slot-header">
+                    <span>Slot {slot.slotNumber}</span>
+                    <span className="slot-badge">Disponible</span>
+                  </div>
+                  <h4>{slot.character.nombre}</h4>
+                  <p>State ID: {slot.character.stateId}</p>
+                  <p>Saldo: ${Number(slot.character.dinero || 0).toLocaleString("es-CL")}</p>
+                  <button className="portal-button" onClick={() => seleccionarPersonaje(slot.character)}>
+                    Jugar con este personaje
+                  </button>
+                </div>
+              );
+            }
+
+            return (
+              <button
+                key={slot.slotNumber}
+                className={`slot-card empty ${isCurrentSelection ? "active" : ""}`}
+                onClick={() => setSelectedSlot(slot.slotNumber)}
+              >
+                <div className="slot-header">
+                  <span>Slot {slot.slotNumber}</span>
+                  <span className="slot-badge">Libre</span>
+                </div>
+                <p>Crear personaje en este slot</p>
+              </button>
+            );
+          })}
+        </div>
+
+        {selectedSlotData?.isUnlocked && !selectedSlotData?.character && (
+          <div className="registro-form-wrap">
+            <h3>Crear Personaje en Slot {selectedSlot}</h3>
+
+            <input
+              type="text"
+              placeholder="Nombre"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Edad"
+              value={edad}
+              onChange={(e) => setEdad(e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Nacionalidad"
+              value={nacionalidad}
+              onChange={(e) => setNacionalidad(e.target.value)}
+            />
+
+            <button className="portal-button" onClick={enviarDatos} disabled={savingCharacter}>
+              {savingCharacter ? "Guardando..." : "Finalizar Registro"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -153,40 +585,49 @@ function Expediente() {
   const navigate = useNavigate();
   const datos = JSON.parse(localStorage.getItem("usuario"));
 
+  // DATOS DE DISCORD DEL USUARIO //
+  const discordUser = JSON.parse(localStorage.getItem("discord_user") || "null");
+
+  // ESTADO DEL PANEL FLOTANTE DE DISCORD //
+  const [discordPanelOpen, setDiscordPanelOpen] = React.useState(false);
+
   React.useEffect(() => {
-    if (!datos) navigate("/");
-  }, [datos, navigate]);
+    const verificarAcceso = async () => {
+      if (!discordUser) {
+        navigate("/");
+        return;
+      }
+
+      // Se respeta el slot activo guardado por el selector de personajes.
+      const activeSlotNumber = Number.parseInt(localStorage.getItem("active_slot_number") || "1", 10);
+      const slotsResult = await obtenerSlotsPersonajes();
+      const slots = Array.isArray(slotsResult.slots) ? slotsResult.slots : [];
+      const activeSlot = slots.find((slot) => slot.slotNumber === activeSlotNumber && slot.character);
+      const firstAvailable = slots.find((slot) => slot.character);
+      const selectedCharacter = activeSlot?.character || firstAvailable?.character || null;
+
+      if (!selectedCharacter) {
+        localStorage.removeItem("usuario");
+        navigate("/registro");
+        return;
+      }
+
+      localStorage.setItem("usuario", JSON.stringify(selectedCharacter));
+      localStorage.setItem("active_slot_number", String(selectedCharacter.slotNumber));
+    };
+
+    verificarAcceso();
+  }, [discordUser, navigate]);
 
   if (!datos) return null;
 
-  const guardarUsuarioDB = async (datos) => {
-
-  const { data, error } = await supabase
-    .from("usuarios")
-    .insert([
-      {
-        stateid: datos.stateId,
-        nombre: datos.nombre,
-        rol: datos.rol || "civil",
-        dinero: START_MONEY
-      }
-    ]);
-
-  if (error) {
-    console.error("Error guardando usuario:", error);
-  } else {
-    console.log("Usuario guardado en DB:", data);
-  }
-
-};
-
   // ================== SECCIONES (sidebar) ==================
 const secciones = [
-  { id: "identidad", label: "Identidad", icon: "🪪" },
-  { id: "finanzas", label: "Finanzas", icon: "💳" },
-  { id: "pertenencias", label: "Pertenencias", icon: "📦" },
-  { id: "municipalidad", label: "Gestión de Multas", icon: "🧾" },
-  { id: "tienda", label: "Mercado", icon: "🏪" },
+  { id: "identidad", label: "Identidad", icon: "id-card" },
+  { id: "finanzas", label: "Finanzas", icon: "card" },
+  { id: "pertenencias", label: "Pertenencias", icon: "box" },
+  { id: "municipalidad", label: "Gestión de Multas", icon: "receipt" },
+  { id: "tienda", label: "Mercado", icon: "store" },
 ];
 
   const [active, setActive] = React.useState("identidad");
@@ -372,7 +813,7 @@ React.useEffect(() => {
       {
         id: "principal",
         name: "Cuenta Principal",
-        balance: 20000, // 💰 dinero inicial
+        balance: 20000, // dinero inicial
       },
     ],
     activeAccountId: "principal",
@@ -430,7 +871,7 @@ const comprarVehiculo = () => {
   if (cuentaActiva.balance < precio)
     return alert("Saldo insuficiente.");
 
-  // 💳 Descontar del banco
+  // Descontar del banco
   setBank((prev) => ({
     ...prev,
     accounts: prev.accounts.map((a) =>
@@ -452,7 +893,7 @@ const comprarVehiculo = () => {
     ],
   }));
 
-  // 📦 Agregar a pertenencias
+  // Agregar a pertenencias
 if (compraSeleccionada.tipo === "licencia") {
   setLicencias((prev) => [
     ...prev,
@@ -478,7 +919,7 @@ if (compraSeleccionada.tipo === "licencia") {
   }));
 } 
 
-  // 📉 Bajar stock
+  // Bajar stock
   setVehiculosTienda((prev) =>
     prev.map((v) =>
       v.id === compraSeleccionada.id
@@ -487,7 +928,7 @@ if (compraSeleccionada.tipo === "licencia") {
     )
   );
 
-  // 🔔 Toast
+  // Toast
   setToast({ type: "success", message: "Vehículo comprado con éxito" });
   setTimeout(() => setToast(null), 3000);
 
@@ -514,7 +955,7 @@ const comprarDocumento = () => {
     return;
   }
 
-  // 💳 Descontar dinero
+  // Descontar dinero
   setBank((prev) => ({
     ...prev,
     accounts: prev.accounts.map((a) =>
@@ -524,7 +965,7 @@ const comprarDocumento = () => {
     ),
   }));
 
-  // 📄 Agregar a pertenencias
+  // Agregar a pertenencias
   const nuevoDoc = {
     id: Date.now(),
     tipo: compraSeleccionada.nombre,
@@ -562,7 +1003,7 @@ const comprarArma = () => {
   if (cuentaActiva.balance < precio)
     return alert("Saldo insuficiente.");
 
-  // 💳 Descontar banco
+  // Descontar banco
   setBank((prev) => ({
     ...prev,
     accounts: prev.accounts.map((a) =>
@@ -572,7 +1013,7 @@ const comprarArma = () => {
     ),
   }));
 
-  // 🎒 Agregar a mochila
+  // Agregar a mochila
   const nuevaArma = {
     id: Date.now(),
     nombre: compraSeleccionada.nombre,
@@ -613,7 +1054,7 @@ const comprarItem = () => {
     return;
   }
 
-  // 💳 DESCONTAR DINERO
+  // DESCONTAR DINERO
   setBank((prev) => ({
     ...prev,
     accounts: prev.accounts.map((a) =>
@@ -635,7 +1076,7 @@ const comprarItem = () => {
     ],
   }));
 
-  // 📄 SI ES LICENCIA → AGREGAR A PERTENENCIAS
+  // SI ES LICENCIA → AGREGAR A PERTENENCIAS
   if (compraSeleccionada.tipo === "licencia") {
 
     // Evitar duplicados
@@ -671,7 +1112,7 @@ const comprarItem = () => {
     }));
   }
 
-  // 🚗 SI ES VEHÍCULO
+  // SI ES VEHICULO
   if (!compraSeleccionada.tipo) {
     setPertenencias((prev) => ({
       ...prev,
@@ -686,7 +1127,7 @@ const comprarItem = () => {
     }));
   }
 
-  // 🔔 TOAST
+  // TOAST
   setToast({
     type: "success",
     message: "Compra realizada con éxito",
@@ -694,7 +1135,7 @@ const comprarItem = () => {
 
   setTimeout(() => setToast(null), 3000);
 
-  // ❌ CERRAR MODAL
+  // CERRAR MODAL
   setCompraSeleccionada(null);
 };
 
@@ -716,7 +1157,7 @@ const comprarItem = () => {
     const text = `Titular: ${bank.titular}\nCuenta: ${activeAccount?.name}\nStateID: ${bank.stateId}`;
     try {
       await navigator.clipboard.writeText(text);
-      alert("Datos copiados ✅");
+      alert("Datos copiados");
     } catch {
       alert("No pude copiar. (Permisos del navegador)");
     }
@@ -784,7 +1225,7 @@ const comprarItem = () => {
     setMonto("");
     setMotivo("");
 
-    setSuccessMessage("Transferencia realizada con éxito ✅");
+    setSuccessMessage("Transferencia realizada con éxito");
     setTimeout(() => setSuccessMessage(""), 2500);
   };
 
@@ -866,6 +1307,48 @@ const comprarItem = () => {
   // ================== UI ==================
   return (
     <div className="expediente-layout">
+
+      {/* BOTON FLOTANTE DE DISCORD (IZQUIERDA) */}
+      <div className="discord-flotante">
+        <button
+          className="discord-flotante-btn"
+          onClick={() => setDiscordPanelOpen(!discordPanelOpen)}
+        >
+          {discordUser?.avatar ? (
+            <img
+              className="discord-flotante-avatar"
+              src={discordUser.avatar}
+              alt="Avatar"
+            />
+          ) : (
+            <AppIcon name="discord" size={20} />
+          )}
+          <span>DISCORD</span>
+        </button>
+
+        {/* PANEL DESPLEGABLE */}
+        {discordPanelOpen && (
+          <div className="discord-panel">
+            <div className="discord-panel-header">
+              {discordUser?.avatar && (
+                <img
+                  className="discord-panel-avatar"
+                  src={discordUser.avatar}
+                  alt="Avatar"
+                />
+              )}
+              <div className="discord-panel-info">
+                <div className="discord-panel-username">{discordUser?.username}</div>
+                <div className="discord-panel-id">ID: {discordUser?.discordId}</div>
+              </div>
+            </div>
+            <button className="discord-panel-logout" onClick={cerrarSesion}>
+              Cerrar Sesión
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* SIDEBAR (derecha) */}
       <aside className="sidebar">
         <div className="sidebar-header">
@@ -887,7 +1370,9 @@ const comprarItem = () => {
               className={`sidebar-item ${active === s.id ? "active" : ""}`}
               onClick={() => setActive(s.id)}
             >
-              <span className="sidebar-icon">{s.icon}</span>
+              <span className="sidebar-icon">
+                <AppIcon name={s.icon} size={18} />
+              </span>
               <span>{s.label}</span>
             </li>
           ))}
@@ -974,7 +1459,9 @@ const comprarItem = () => {
                 <div className="bank-left">
                   <div className="bank-card">
                     <div className="bank-card-row">
-                      <div className="chip">▦</div>
+                      <div className="chip">
+                        <AppIcon name="chip" size={16} />
+                      </div>
                       <div className="bank-brand">{bank.brand}</div>
                     </div>
 
@@ -986,7 +1473,7 @@ const comprarItem = () => {
                         {bank.hideBalance ? "****" : Number(activeAccount?.balance || 0).toLocaleString("en-US")}
                       </span>
                       <button className="eye" onClick={toggleHideBalance} title="Mostrar/Ocultar">
-                        {bank.hideBalance ? "👁️" : "🙈"}
+                        <AppIcon name={bank.hideBalance ? "eye" : "eye-off"} size={18} />
                       </button>
                     </div>
 
@@ -1018,7 +1505,9 @@ const comprarItem = () => {
 
                 <div className="bank-right">
                   <div className="bank-usercard">
-                    <div className="user-icon">💼</div>
+                    <div className="user-icon">
+                      <AppIcon name="briefcase" size={20} />
+                    </div>
                     <div>
                       <div className="user-title">Ciudadano</div>
                       <div className="user-sub">Nómina al día. Próximo pago pronto.</div>
@@ -1030,17 +1519,23 @@ const comprarItem = () => {
 
                     <div className="ops-grid">
                       <button className="op-btn op-primary" onClick={() => setOpenTransfer(true)}>
-                        <div className="op-icon">✈️</div>
+                        <div className="op-icon">
+                          <AppIcon name="send" size={20} />
+                        </div>
                         <div className="op-text">Transferir</div>
                       </button>
 
                       <button className="op-btn" onClick={copyDatos}>
-                        <div className="op-icon">📋</div>
+                        <div className="op-icon">
+                          <AppIcon name="copy" size={20} />
+                        </div>
                         <div className="op-text">Copiar Datos</div>
                       </button>
 
                       <button className="op-btn" onClick={() => setOpenContact(true)}>
-                        <div className="op-icon">👤➕</div>
+                        <div className="op-icon">
+                          <AppIcon name="user-plus" size={20} />
+                        </div>
                         <div className="op-text">Nuevo Contacto</div>
                       </button>
                     </div>
@@ -1054,7 +1549,9 @@ const comprarItem = () => {
                   <div className="modal" onClick={(e) => e.stopPropagation()}>
                     <div className="modal-head">
                       <div className="modal-title">Transferencias</div>
-                      <button className="modal-x" onClick={() => setOpenTransfer(false)}>✕</button>
+                      <button className="modal-x icon-btn" onClick={() => setOpenTransfer(false)} aria-label="Cerrar transferencia">
+                        <AppIcon name="close" size={18} />
+                      </button>
                     </div>
 
                     <div className="modal-tabs">
@@ -1100,7 +1597,9 @@ const comprarItem = () => {
                   <div className="modal small" onClick={(e) => e.stopPropagation()}>
                     <div className="modal-head">
                       <div className="modal-title">Agregar Contacto</div>
-                      <button className="modal-x" onClick={() => setOpenContact(false)}>✕</button>
+                      <button className="modal-x icon-btn" onClick={() => setOpenContact(false)} aria-label="Cerrar contacto">
+                        <AppIcon name="close" size={18} />
+                      </button>
                     </div>
 
                     <div className="modal-body">
@@ -1125,13 +1624,16 @@ const comprarItem = () => {
             <div className="pertenencias-wrap">
               <div className="pertenencias-tabs">
                 <button className={`tab-btn ${subTab === "vehiculos" ? "active" : ""}`} onClick={() => setSubTab("vehiculos")}>
-                  🚗 Vehículos
+                  <AppIcon name="car" size={18} />
+                  <span>Vehículos</span>
                 </button>
                 <button className={`tab-btn ${subTab === "documentos" ? "active" : ""}`} onClick={() => setSubTab("documentos")}>
-                  🪪 Documentos
+                  <AppIcon name="document" size={18} />
+                  <span>Documentos</span>
                 </button>
                 <button className={`tab-btn ${subTab === "mochila" ? "active" : ""}`} onClick={() => setSubTab("mochila")}>
-                  🎒 Mochila
+                  <AppIcon name="backpack" size={18} />
+                  <span>Mochila</span>
                 </button>
               </div>
 
@@ -1218,13 +1720,16 @@ const comprarItem = () => {
               </div>
 
               <button className="muni-back" onClick={() => setActive("identidad")}>
-                ← Volver a Mi Expediente
+                <AppIcon name="arrow-left" size={18} />
+                <span>Volver a Mi Expediente</span>
               </button>
 
               <div className="muni-grid">
                 <div className="muni-card">
                   <div className="muni-card-head">
-                    <span className="muni-card-icon">🧾</span>
+                    <span className="muni-card-icon">
+                      <AppIcon name="receipt" size={18} />
+                    </span>
                     <span className="muni-card-title">Multas Pendientes de Pago</span>
                   </div>
 
@@ -1252,7 +1757,9 @@ const comprarItem = () => {
 
                 <div className="muni-card muni-card-total">
                   <div className="muni-card-head">
-                    <span className="muni-card-icon">💰</span>
+                    <span className="muni-card-icon">
+                      <AppIcon name="money" size={18} />
+                    </span>
                     <span className="muni-card-title">Total a Pagar</span>
                   </div>
 
@@ -1275,7 +1782,9 @@ const comprarItem = () => {
 
                 <div className="muni-card">
                   <div className="muni-card-head">
-                    <span className="muni-card-icon">⚖️</span>
+                    <span className="muni-card-icon">
+                      <AppIcon name="scale" size={18} />
+                    </span>
                     <span className="muni-card-title">Antecedentes Penales</span>
                   </div>
 
@@ -1315,7 +1824,9 @@ const comprarItem = () => {
 
     {toast && (
       <div className={`toast toast-${toast.type}`}>
-        <span className="toast-icon">✔</span>
+        <span className="toast-icon">
+          <AppIcon name={toast.type === "error" ? "close" : "check"} size={16} />
+        </span>
         <span>{toast.message}</span>
       </div>
     )}
@@ -1332,21 +1843,24 @@ const comprarItem = () => {
     className={`tab-btn ${tiendaTab === "vehiculos" ? "active" : ""}`}
     onClick={() => setTiendaTab("vehiculos")}
   >
-    🚗 Vehículos
+    <AppIcon name="car" size={18} />
+    <span>Vehículos</span>
   </button>
 
   <button
     className={`tab-btn ${tiendaTab === "documentos" ? "active" : ""}`}
     onClick={() => setTiendaTab("documentos")}
   >
-    📄 Documentos
+    <AppIcon name="document" size={18} />
+    <span>Documentos</span>
   </button>
 
   <button
     className={`tab-btn ${tiendaTab === "armas" ? "active" : ""}`}
     onClick={() => setTiendaTab("armas")}
   >
-    🔫 Armas
+    <AppIcon name="gun" size={18} />
+    <span>Armas</span>
   </button>
 </div>
 
@@ -1358,7 +1872,9 @@ const comprarItem = () => {
       
       <div className="preview-header">
         <h2>{vehiculoPreview.nombre}</h2>
-        <button onClick={() => setVehiculoPreview(null)}>✕</button>
+        <button className="icon-btn" onClick={() => setVehiculoPreview(null)} aria-label="Cerrar vista previa">
+          <AppIcon name="close" size={18} />
+        </button>
       </div>
 
       <div className="preview-body">
@@ -1382,7 +1898,8 @@ const comprarItem = () => {
               setVehiculoPreview(null);
             }}
           >
-            💳 Confirmar Compra
+            <AppIcon name="card" size={18} />
+            <span>Confirmar Compra</span>
           </button>
         </div>
       </div>
@@ -1395,7 +1912,9 @@ const comprarItem = () => {
     <div className="modal-compra" onClick={(e) => e.stopPropagation()}>
       <div className="modal-header">
         <h3>Confirmar Compra</h3>
-        <button onClick={() => setCompraSeleccionada(null)}>✕</button>
+        <button className="icon-btn" onClick={() => setCompraSeleccionada(null)} aria-label="Cerrar compra">
+          <AppIcon name="close" size={18} />
+        </button>
       </div>
 
       <div className="modal-body">
@@ -1445,6 +1964,7 @@ const comprarItem = () => {
 
                   <button
                     className="buy-btn"
+                    aria-label={`Comprar ${doc.nombre}`}
                     onClick={() =>
                       setCompraSeleccionada({
                         ...doc,
@@ -1452,7 +1972,7 @@ const comprarItem = () => {
                       })
                     }
                   >
-                    🛒
+                    <AppIcon name="cart" size={18} />
                   </button>
                 </div>
               </div>
@@ -1482,10 +2002,11 @@ const comprarItem = () => {
 
                   <button
                     className="buy-btn"
+                    aria-label={`Ver ${auto.nombre}`}
                     onClick={() => setVehiculoPreview(auto)}
                     disabled={auto.stock <= 0}
                   >
-                    🛒
+                    <AppIcon name="cart" size={18} />
                   </button>
                 </div>
               </div>
@@ -1514,6 +2035,7 @@ const comprarItem = () => {
 
                   <button
                     className="buy-btn"
+                    aria-label={`Comprar ${arma.nombre}`}
                     onClick={() =>
                       setCompraSeleccionada({
                         ...arma,
@@ -1521,7 +2043,7 @@ const comprarItem = () => {
                       })
                     }
                   >
-                    🛒
+                    <AppIcon name="cart" size={18} />
                   </button>
                 </div>
               </div>

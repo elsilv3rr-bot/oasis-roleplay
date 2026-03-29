@@ -1,8 +1,6 @@
 import React from "react"
 import { useNavigate } from "react-router-dom"
-import { supabase } from "../supabase"
-
-const START_MONEY = 20000
+import { registrarPersonaje } from "../api"
 
 export default function Registro() {
   const navigate = useNavigate();
@@ -36,23 +34,18 @@ function generarStateID() {
   stateId: generarStateID(),
 };
 
-console.log("Insertando usuario:", datos)
-
-const { data, error } = await supabase
-  .from("usuarios")
-  .insert({
-  stateid: datos.stateId,
-  nombre: datos.nombre,
-  edad: datos.edad,
-  nacionalidad: datos.nacionalidad,
-  rol: datos.rol,
-  dinero: START_MONEY
-})
-
-if (error) {
+try {
+  await registrarPersonaje({
+    stateId: datos.stateId,
+    nombre: datos.nombre,
+    edad: datos.edad,
+    nacionalidad: datos.nacionalidad,
+    rol: datos.rol,
+  });
+} catch (error) {
   console.error("Error insertando usuario:", error)
-} else {
-  console.log("Usuario guardado en DB:", data)
+  alert(error.message || "No se pudo completar el registro")
+  return
 }
 
     const jugadores = JSON.parse(localStorage.getItem("jugadores")) || [];

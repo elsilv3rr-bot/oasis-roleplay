@@ -2,9 +2,6 @@ import Sidebar from "../components/sidebar";
 
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../supabase";
-
-const START_MONEY = 20000;
 
 import Banco from "../modules/banco/banco";
 import Pertenencias from "../modules/pertenencias/pertenencias";
@@ -21,27 +18,6 @@ export default function Expediente() {
   }, [datos, navigate]);
 
   if (!datos) return null;
-
-  const guardarUsuarioDB = async (datos) => {
-
-  const { data, error } = await supabase
-    .from("usuarios")
-    .insert([
-      {
-        stateid: datos.stateId,
-        nombre: datos.nombre,
-        rol: datos.rol || "civil",
-        dinero: START_MONEY
-      }
-    ]);
-
-  if (error) {
-    console.error("Error guardando usuario:", error);
-  } else {
-    console.log("Usuario guardado en DB:", data);
-  }
-
-};
 
   // ================== SECCIONES (sidebar) ==================
 const secciones = [
