@@ -672,6 +672,7 @@ const secciones = [
   }
 
   const [active, setActive] = React.useState("identidad");
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [tiendaTab, setTiendaTab] = React.useState("vehiculos");
   const [compraSeleccionada, setCompraSeleccionada] = React.useState(null);
   const [vehiculoPreview, setVehiculoPreview] = React.useState(null);
@@ -745,6 +746,7 @@ const secciones = [
     { id: 52, nombre: "BKM 1200 Tourer", precio: 9000, stock: 20, imagen: "/autos/Tourer.png" },
     { id: 53, nombre: "Vellfire XY6", precio: 12000, stock: 20, imagen: "/autos/XY6.png" },
     { id: 54, nombre: "Vellfire R1", precio: 18500, stock: 20, imagen: "/autos/R1.png" },
+    { id: 55, nombre: "Falcon Grinder", precio: 30000, stock: 100, imagen: "/autos/raptor-citizen.png" },
   ]);
   const documentosTienda = [
   { id: 1, nombre: "Licencia de Conducir", precio: 1500, imagen: "/licencias/licencia.png" },
@@ -859,6 +861,24 @@ useEffect(() => {
     window.location.reload();
   }
 }, []);
+
+  React.useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth > 768) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const handleSectionChange = (sectionId) => {
+    setActive(sectionId);
+    if (window.innerWidth <= 768) {
+      setMobileMenuOpen(false);
+    }
+  };
 
   // ================== REGISTRO DE STATEIDs EXISTENTES ==================
   React.useEffect(() => {
@@ -1591,8 +1611,43 @@ const comprarItem = async () => {
         )}
       </div>
 
+      <div className="mobile-expediente-nav">
+        <div className="mobile-expediente-brand">
+          <img
+            className="mobile-expediente-logo"
+            src="/logo/logo.png"
+            alt="Logo"
+            onError={(e) => {
+              if (!e.currentTarget.dataset.fallback) {
+                e.currentTarget.dataset.fallback = "1";
+                e.currentTarget.src = "/logo.png";
+                return;
+              }
+              e.currentTarget.style.display = "none";
+            }}
+          />
+          <span>Expediente</span>
+        </div>
+        <button
+          type="button"
+          className="mobile-expediente-toggle"
+          aria-label="Abrir menu del expediente"
+          aria-expanded={mobileMenuOpen}
+          onClick={() => setMobileMenuOpen((prev) => !prev)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+      </div>
+
+      <div
+        className={`mobile-expediente-overlay ${mobileMenuOpen ? "open" : ""}`}
+        onClick={() => setMobileMenuOpen(false)}
+      />
+
       {/* SIDEBAR (derecha) */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${mobileMenuOpen ? "mobile-open" : ""}`}>
         <div className="sidebar-header">
           <img
             className="sidebar-logo"
@@ -1617,7 +1672,7 @@ const comprarItem = async () => {
             <li
               key={s.id}
               className={`sidebar-item ${active === s.id ? "active" : ""}`}
-              onClick={() => setActive(s.id)}
+              onClick={() => handleSectionChange(s.id)}
             >
               <span className="sidebar-icon">
                 <AppIcon name={s.icon} size={18} />
