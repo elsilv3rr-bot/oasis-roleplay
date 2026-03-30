@@ -607,6 +607,178 @@ async function operarCrypto(accion, moneda, cantidad, slotNumber = 1) {
   return data;
 }
 
+// ═══════════ NUEVOS ENDPOINTS V2 ═══════════
+
+// ─── MISIONES ───
+async function obtenerMisiones(slotNumber = 1) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/internal?domain=misiones&action=disponibles&discordId=me&slot=${slotNumber}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error obteniendo misiones");
+  return data;
+}
+
+async function obtenerProgresoMisiones(slotNumber = 1) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/internal?domain=misiones&action=progreso&discordId=me&slot=${slotNumber}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error obteniendo progreso");
+  return data;
+}
+
+async function cobrarMision(misionId, slotNumber = 1) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/internal`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ domain: "misiones", action: "cobrar", discordId: "me", slot: slotNumber, misionId }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error cobrando mision");
+  return data;
+}
+
+// ─── FACCIONES ───
+async function listarFacciones() {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/internal?domain=facciones&action=listar`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error listando facciones");
+  return data;
+}
+
+async function detalleFaccion(faccionId) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/internal?domain=facciones&action=detalle&faccionId=${faccionId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error obteniendo faccion");
+  return data;
+}
+
+async function miFaccion(slotNumber = 1) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/internal?domain=facciones&action=mi_faccion&discordId=me&slot=${slotNumber}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error obteniendo faccion");
+  return data;
+}
+
+async function unirseFaccion(faccionId, slotNumber = 1) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/internal`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ domain: "facciones", action: "unirse", discordId: "me", slot: slotNumber, faccionId }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error uniendose");
+  return data;
+}
+
+async function depositarFaccion(monto, slotNumber = 1) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/internal`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ domain: "facciones", action: "depositar", discordId: "me", slot: slotNumber, monto }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error depositando");
+  return data;
+}
+
+// ─── LEADERBOARD ───
+async function obtenerLeaderboard(categoria = "dinero", limit = 10) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/internal?domain=leaderboard&action=top_${categoria}&limit=${limit}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error obteniendo ranking");
+  return data;
+}
+
+async function obtenerPerfilCompleto(slotNumber = 1) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/internal?domain=leaderboard&action=perfil_completo&discordId=me&slot=${slotNumber}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error obteniendo perfil");
+  return data;
+}
+
+// ─── MERCADO P2P ───
+async function obtenerOfertasMercado(tipo = null) {
+  const token = getToken();
+  const url = tipo
+    ? `${API_URL}/internal?domain=mercado&action=ofertas&tipo=${tipo}`
+    : `${API_URL}/internal?domain=mercado&action=ofertas`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error obteniendo ofertas");
+  return data;
+}
+
+async function crearOfertaMercado(tipoItem, nombreItem, precio, descripcion, slotNumber = 1) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/internal`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ domain: "mercado", action: "crear_oferta", discordId: "me", slot: slotNumber, tipoItem, nombreItem, precio, descripcion }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error creando oferta");
+  return data;
+}
+
+async function comprarOfertaMercado(ofertaId, slotNumber = 1) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/internal`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ domain: "mercado", action: "comprar_oferta", discordId: "me", slot: slotNumber, ofertaId }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error comprando oferta");
+  return data;
+}
+
+// ─── EVENTOS ───
+async function obtenerEventosActivos() {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/internal?domain=mercado&action=eventos_activos`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error obteniendo eventos");
+  return data;
+}
+
+async function inscribirEvento(eventoId, slotNumber = 1) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/internal`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ domain: "mercado", action: "inscribir_evento", discordId: "me", slot: slotNumber, eventoId }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error inscribiendose");
+  return data;
+}
+
 export {
   getToken,
   setToken,
@@ -643,5 +815,21 @@ export {
   jugarCasino,
   obtenerEstadoCrypto,
   operarCrypto,
+  // V2 - Nuevos
+  obtenerMisiones,
+  obtenerProgresoMisiones,
+  cobrarMision,
+  listarFacciones,
+  detalleFaccion,
+  miFaccion,
+  unirseFaccion,
+  depositarFaccion,
+  obtenerLeaderboard,
+  obtenerPerfilCompleto,
+  obtenerOfertasMercado,
+  crearOfertaMercado,
+  comprarOfertaMercado,
+  obtenerEventosActivos,
+  inscribirEvento,
 };
 

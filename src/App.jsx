@@ -2,6 +2,11 @@ import React from "react"
 import { useState, useEffect } from "react"
 import { Routes, Route, useNavigate, useSearchParams } from "react-router-dom"
 import { iniciarLoginDiscord, obtenerSlotsPersonajes, desbloquearSlotPersonaje, obtenerUsuario, registrarPersonaje, setToken, cerrarSesion, obtenerSaldoDB, transferirDineroDB, verificarAdmin, obtenerDatosAdmin, accionAdmin, consultaPolicial, accionPolicial, obtenerRecompensaDiaria, cobrarRecompensaDiaria, registrarVehiculoDB, obtenerMultasDB, pagarMultaDB, pagarTodasMultasDB, obtenerCatalogoVehiculos, obtenerItemsMercado, sincronizarCatalogoVehiculos, sincronizarItemsMercado, comprarVehiculoTienda, comprarItemTienda, obtenerEstadoCasino, comprarEntradaCasino, jugarCasino, obtenerEstadoCrypto, operarCrypto } from "./api"
+import Misiones from "./modules/misiones/Misiones"
+import Facciones from "./modules/facciones/Facciones"
+import Leaderboard from "./modules/leaderboard/Leaderboard"
+import MercadoP2P from "./modules/mercadop2p/MercadoP2P"
+import Eventos from "./modules/eventos/Eventos"
 import "./App.css"
 
 function AppIcon({ name, size = 20, className = "" }) {
@@ -247,6 +252,54 @@ function AppIcon({ name, size = 20, className = "" }) {
         <svg {...iconProps}>
           <circle cx="12" cy="12" r="3" />
           <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+        </svg>
+      );
+    case "target":
+      return (
+        <svg {...iconProps}>
+          <circle cx="12" cy="12" r="10" />
+          <circle cx="12" cy="12" r="6" />
+          <circle cx="12" cy="12" r="2" />
+        </svg>
+      );
+    case "users":
+      return (
+        <svg {...iconProps}>
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      );
+    case "trophy":
+      return (
+        <svg {...iconProps}>
+          <path d="M6 9H4a2 2 0 0 1-2-2V5h4" />
+          <path d="M18 9h2a2 2 0 0 0 2-2V5h-4" />
+          <path d="M4 22h16" />
+          <path d="M10 22V8a6 6 0 0 0 4 0v14" />
+          <path d="M6 5v4c0 3.3 2.7 6 6 6s6-2.7 6-6V5" />
+        </svg>
+      );
+    case "handshake":
+      return (
+        <svg {...iconProps}>
+          <path d="M11 17l-1 4-4-1 1-4" />
+          <path d="M13 17l1 4 4-1-1-4" />
+          <path d="M2 9l5-5 3 3 2-2 2 2 3-3 5 5" />
+          <path d="M2 9l7 7h6l7-7" />
+        </svg>
+      );
+    case "calendar":
+      return (
+        <svg {...iconProps}>
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <path d="M16 2v4" />
+          <path d="M8 2v4" />
+          <path d="M3 10h18" />
+          <path d="M8 14h.01" />
+          <path d="M12 14h.01" />
+          <path d="M16 14h.01" />
         </svg>
       );
     default:
@@ -662,6 +715,11 @@ const secciones = [
   { id: "casino", label: "Casino", icon: "crown" },
   { id: "crypto", label: "Crypto", icon: "money" },
   { id: "recompensas", label: "Collect Diario", icon: "gift" },
+  { id: "misiones", label: "Misiones", icon: "target" },
+  { id: "facciones", label: "Facciones", icon: "users" },
+  { id: "leaderboard", label: "Rankings", icon: "trophy" },
+  { id: "mercadop2p", label: "Mercado P2P", icon: "handshake" },
+  { id: "eventos", label: "Eventos", icon: "calendar" },
 ];
 
   // Seccion policia: solo visible si el rol es policia //
@@ -2469,7 +2527,12 @@ const comprarItem = async () => {
                 active !== "crypto" &&
                 active !== "recompensas" &&
                 active !== "policia" &&
-                active !== "admin" && (
+                active !== "admin" &&
+                active !== "misiones" &&
+                active !== "facciones" &&
+                active !== "leaderboard" &&
+                active !== "mercadop2p" &&
+                active !== "eventos" && (
                   <div className="right-empty">
                   </div>
                 )}
@@ -2478,6 +2541,21 @@ const comprarItem = async () => {
               {active === "recompensas" && (
                 <RecompensasPanel datos={datos} setBank={setBank} />
               )}
+
+              {/* ================= MISIONES ================= */}
+              {active === "misiones" && <Misiones />}
+
+              {/* ================= FACCIONES ================= */}
+              {active === "facciones" && <Facciones />}
+
+              {/* ================= LEADERBOARD ================= */}
+              {active === "leaderboard" && <Leaderboard />}
+
+              {/* ================= MERCADO P2P ================= */}
+              {active === "mercadop2p" && <MercadoP2P />}
+
+              {/* ================= EVENTOS ================= */}
+              {active === "eventos" && <Eventos />}
 
               {/* ================= POLICIA ================= */}
               {active === "policia" && esPolicia && (
