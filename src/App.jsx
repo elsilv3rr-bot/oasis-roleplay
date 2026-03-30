@@ -974,13 +974,16 @@ useEffect(() => {
 
   // ================== MULTAS (Identidad / Municipalidad) ==================
   const [multasState, setMultasState] = React.useState([]);
+  const [cargosState, setCargosState] = React.useState([]);
 
   const cargarMultas = React.useCallback(async () => {
     try {
       const data = await obtenerMultasDB(datos.slotNumber || 1);
       setMultasState(Array.isArray(data?.multas) ? data.multas : []);
+      setCargosState(Array.isArray(data?.cargos) ? data.cargos : []);
     } catch {
       setMultasState([]);
+      setCargosState([]);
     }
   }, [datos.slotNumber]);
 
@@ -988,7 +991,7 @@ useEffect(() => {
     cargarMultas();
   }, [cargarMultas]);
 
-  const estadoJudicial = multasState.length > 0 ? "CON ANTECEDENTES" : "LIMPIO";
+  const estadoJudicial = (multasState.length > 0 || cargosState.length > 0) ? "CON ANTECEDENTES" : "LIMPIO";
 
   // ================== PERTENENCIAS ==================
   const pertenenciasKey = `pertenencias_${datos.nombre}`;
@@ -1582,6 +1585,10 @@ const comprarItem = async () => {
       return alert(err.message || "Error al pagar la multa. Intenta de nuevo.");
     }
 
+    if (typeof result?.dinero !== "number" || result.dinero < 0) {
+      return alert("Error: respuesta del servidor invalida al pagar multa.");
+    }
+
     setBank((prev) => ({
       ...prev,
       accounts: prev.accounts.map((a) =>
@@ -1822,17 +1829,29 @@ const comprarItem = async () => {
 
               <div className="mini-card mini-card-wide">
                 <h3>Hoja de Vida</h3>
-                {multasState.length === 0 ? (
-                  <p>Sin multas registradas.</p>
+                {multasState.length === 0 && cargosState.length === 0 ? (
+                  <p>Sin registros judiciales.</p>
                 ) : (
-                  multasState.map((multa) => (
-                    <div key={multa.id} className="multa-item">
-                      <p><strong>Fecha:</strong> {multa.fecha}</p>
-                      <p><strong>Motivo:</strong> {multa.motivo}</p>
-                      <p><strong>Monto:</strong> {multa.monto}</p>
-                      <hr />
-                    </div>
-                  ))
+                  <>
+                    {multasState.map((multa) => (
+                      <div key={`multa_${multa.id}`} className="multa-item">
+                        <p><strong>Tipo:</strong> Multa</p>
+                        <p><strong>Fecha:</strong> {multa.fecha}</p>
+                        <p><strong>Motivo:</strong> {multa.motivo}</p>
+                        <p><strong>Monto:</strong> {multa.monto}</p>
+                        <hr />
+                      </div>
+                    ))}
+                    {cargosState.map((cargo) => (
+                      <div key={`cargo_${cargo.id}`} className="multa-item">
+                        <p><strong>Tipo:</strong> Cargo judicial</p>
+                        <p><strong>Fecha:</strong> {cargo.fecha}</p>
+                        <p><strong>Cargo:</strong> {cargo.cargo}</p>
+                        <p><strong>Gravedad:</strong> {cargo.gravedad}</p>
+                        <hr />
+                      </div>
+                    ))}
+                  </>
                 )}
               </div>
 
@@ -1844,7 +1863,7 @@ const comprarItem = async () => {
                 {estadoJudicial === "LIMPIO" ? (
                   <span>Sin antecedentes penales.</span>
                 ) : (
-                  <span>Posee infracciones registradas.</span>
+                  <span>Posee multas y/o cargos judiciales registrados.</span>
                 )}
               </div>
             </div>
@@ -2229,22 +2248,33 @@ const comprarItem = async () => {
                     <div className={`muni-status ${estadoJudicial === "LIMPIO" ? "ok" : "bad"}`}>
                       {estadoJudicial === "LIMPIO"
                         ? "Tu expediente está limpio."
-                        : "Posees antecedentes: existen infracciones registradas."}
+                        : "Posees antecedentes: existen multas y/o cargos judiciales registrados."}
                     </div>
 
                     <div className="muni-history-title">Historial</div>
 
-                    {multasState.length === 0 ? (
+                    {multasState.length === 0 && cargosState.length === 0 ? (
                       <div className="muni-empty">Sin registros.</div>
                     ) : (
                       <div className="muni-history">
                         {multasState.map((m) => (
-                          <div key={m.id} className="muni-history-item">
+                          <div key={`multa_${m.id}`} className="muni-history-item">
                             <div className="muni-history-top">
+                              <span className="tag">Multa</span>
                               <span className="tag">{m.fecha}</span>
                               <span className="tag money">{formatUSD(parseMonto(m.monto))}</span>
                             </div>
                             <div className="muni-history-motivo">{m.motivo}</div>
+                          </div>
+                        ))}
+                        {cargosState.map((c) => (
+                          <div key={`cargo_${c.id}`} className="muni-history-item">
+                            <div className="muni-history-top">
+                              <span className="tag">Cargo</span>
+                              <span className="tag">{c.fecha}</span>
+                              <span className="tag">{String(c.gravedad || "leve").toUpperCase()}</span>
+                            </div>
+                            <div className="muni-history-motivo">{c.cargo}</div>
                           </div>
                         ))}
                       </div>
@@ -2645,7 +2675,7 @@ function RecompensasPanel({ datos, setBank }) {
       <div className="recompensas-hero">
         <AppIcon name="gift" size={40} />
         <h2>Collect Diario</h2>
-        <p>Reclama tu recompensa diaria según tu nivel VIP y profesión.</p>
+        <p>Reclama tu recompensa diaria según tu stack VIP y profesión.</p>
       </div>
 
       {mensaje && (
@@ -2655,8 +2685,15 @@ function RecompensasPanel({ datos, setBank }) {
       {estado && (
         <div className="recompensas-grid">
           <div className="recompensas-card">
-            <div className="recompensas-card-titulo">VIP: {estado.desglose?.vip?.nivel?.toUpperCase()}</div>
+            <div className="recompensas-card-titulo">VIP: {(estado.desglose?.vip?.niveles || ["ninguno"]).join(" + ").toUpperCase()}</div>
             <div className="recompensas-card-valor">+${estado.desglose?.vip?.monto?.toLocaleString()}</div>
+            {Array.isArray(estado.desglose?.vip?.detalle) && estado.desglose.vip.detalle.length > 1 && (
+              <div className="recompensas-card-subdetalle">
+                {estado.desglose.vip.detalle.map((item) => (
+                  <div key={item.nivel}>{item.nivel}: +${Number(item.monto || 0).toLocaleString()}</div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="recompensas-card">
@@ -3352,9 +3389,10 @@ function AdminPanel({ discordId }) {
                   <option value="">Seleccionar VIP</option>
                   {niveles.map(n => <option key={n.id} value={n.nombre}>{n.nombre} (+${n.recompensa_diaria})</option>)}
                 </select>
-                <button className="admin-btn" onClick={() => { ejecutarAccionUsuario("asignar_vip", { nivel: vipAsignar }); }}>Asignar VIP</button>
-                <button className="admin-btn-danger" onClick={() => { ejecutarAccionUsuario("quitar_vip"); }}>Quitar VIP</button>
+                <button className="admin-btn" onClick={() => { ejecutarAccionUsuario("asignar_vip", { nivel: vipAsignar }); }}>Agregar VIP al stack</button>
+                <button className="admin-btn-danger" onClick={() => { ejecutarAccionUsuario("quitar_vip", vipAsignar ? { nivel: vipAsignar } : {}); }}>Quitar VIP</button>
               </div>
+              <div className="admin-accion-ayuda">Tope: 10 VIPs por usuario. Si seleccionas un VIP, se quita solo ese; sin selección, limpia todo el stack.</div>
             </div>
 
             <div className="admin-accion-grupo">

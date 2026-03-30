@@ -5,6 +5,68 @@ import jwt from "jsonwebtoken";
 import { crearConexion, cerrarConexion } from "../lib/api/database.js";
 import { aplicarHeaders } from "../lib/api/seguridad.js";
 
+function parseVipStack(rawValue) {
+  const text = String(rawValue || "").trim();
+  if (!text) return [];
+
+  const values = text
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item && item.toLowerCase() !== "ninguno");
+
+  const unique = [];
+  const seen = new Set();
+  for (const value of values) {
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(value);
+  }
+
+  return unique;
+}
+
+async function calcularRecompensaVip(connection, nivelVipRaw) {
+  const niveles = parseVipStack(nivelVipRaw).slice(0, 10);
+
+  if (niveles.length === 0) {
+    const [vipRows] = await connection.execute(
+      "SELECT recompensa_diaria FROM niveles_vip WHERE nombre = ? LIMIT 1",
+      ["ninguno"]
+    );
+
+    const montoBase = vipRows.length > 0 ? Number(vipRows[0].recompensa_diaria) : 500;
+    return {
+      niveles: ["ninguno"],
+      montoTotal: montoBase,
+      detalle: [{ nivel: "ninguno", monto: montoBase }],
+    };
+  }
+
+  const placeholders = niveles.map(() => "?").join(",");
+  const [rows] = await connection.execute(
+    `SELECT nombre, recompensa_diaria FROM niveles_vip WHERE nombre IN (${placeholders})`,
+    niveles
+  );
+
+  const rewardByName = new Map(
+    rows.map((row) => [String(row.nombre).toLowerCase(), Number(row.recompensa_diaria || 0)])
+  );
+
+  const detalle = niveles.map((nivel) => ({
+    nivel,
+    monto: rewardByName.get(nivel.toLowerCase()) || 0,
+  }));
+
+  const montoTotal = detalle.reduce((acc, item) => acc + Number(item.monto || 0), 0);
+
+  return {
+    niveles,
+    montoTotal,
+    detalle,
+  };
+}
+
 export default async function handler(req, res) {
   aplicarHeaders(res);
 
@@ -59,11 +121,8 @@ export default async function handler(req, res) {
       const restanteMs = yaCobrado ? (ventana24hMs - (ahoraMs - ultimoCobroMs)) : 0;
       const proximoCobroEnSegundos = Math.max(0, Math.ceil(restanteMs / 1000));
 
-      // Obtener recompensa VIP //
-      const [vipRows] = await connection.execute(
-        "SELECT recompensa_diaria FROM niveles_vip WHERE nombre = ? LIMIT 1",
-        [p.nivel_vip || "ninguno"]
-      );
+      // Obtener recompensa VIP acumulada //
+      const vipData = await calcularRecompensaVip(connection, p.nivel_vip);
 
       // Obtener salario por profesion //
       const [profRows] = await connection.execute(
@@ -71,7 +130,7 @@ export default async function handler(req, res) {
         [p.rol || "civil"]
       );
 
-      const recompensaVip = vipRows.length > 0 ? Number(vipRows[0].recompensa_diaria) : 500;
+      const recompensaVip = Number(vipData.montoTotal || 0);
       const salarioProfesion = profRows.length > 0 ? Number(profRows[0].salario_diario) : 500;
       const montoTotal = recompensaVip + salarioProfesion;
 
@@ -82,13 +141,19 @@ export default async function handler(req, res) {
         ultimoCobro: ultimoCobro ? ultimoCobro.toISOString() : null,
         monto: montoTotal,
         desglose: {
-          vip: { nivel: p.nivel_vip || "ninguno", monto: recompensaVip },
+          vip: {
+            nivel: vipData.niveles.join(" + "),
+            niveles: vipData.niveles,
+            monto: recompensaVip,
+            montoTotal: recompensaVip,
+            detalle: vipData.detalle,
+          },
           profesion: { rol: p.rol || "civil", monto: salarioProfesion }
         },
         personaje: {
           nombre: p.nombre,
           rol: p.rol,
-          nivelVip: p.nivel_vip,
+          nivelVip: vipData.niveles,
           dinero: Number(p.dinero)
         }
       });
@@ -131,17 +196,14 @@ export default async function handler(req, res) {
     }
 
     // Calcular monto //
-    const [vipRows] = await connection.execute(
-      "SELECT recompensa_diaria FROM niveles_vip WHERE nombre = ? LIMIT 1",
-      [p.nivel_vip || "ninguno"]
-    );
+    const vipData = await calcularRecompensaVip(connection, p.nivel_vip);
 
     const [profRows] = await connection.execute(
       "SELECT salario_diario FROM profesiones WHERE nombre = ? LIMIT 1",
       [p.rol || "civil"]
     );
 
-    const recompensaVip = vipRows.length > 0 ? Number(vipRows[0].recompensa_diaria) : 500;
+    const recompensaVip = Number(vipData.montoTotal || 0);
     const salarioProfesion = profRows.length > 0 ? Number(profRows[0].salario_diario) : 500;
     const montoTotal = recompensaVip + salarioProfesion;
 
@@ -159,10 +221,12 @@ export default async function handler(req, res) {
 
     await connection.commit();
 
+    const dineroFinal = Math.max(0, Number(p.dinero || 0) + Number(montoTotal || 0));
+
     return res.status(200).json({
       ok: true,
       monto: montoTotal,
-      dinero: Number(p.dinero) + montoTotal,
+      dinero: dineroFinal,
       mensaje: `Recompensa de $${montoTotal.toLocaleString()} cobrada`
     });
 

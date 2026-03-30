@@ -14,6 +14,26 @@ function parseBody(body) {
   return body;
 }
 
+function parseVipStack(rawValue) {
+  const text = String(rawValue || "").trim();
+  if (!text) return [];
+
+  const values = text
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item && item.toLowerCase() !== "ninguno");
+
+  const unique = [];
+  const seen = new Set();
+  for (const value of values) {
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(value);
+  }
+  return unique;
+}
+
 export default async function handler(req, res) {
   aplicarHeaders(res);
 
@@ -36,9 +56,10 @@ export default async function handler(req, res) {
   let connection;
   try {
     connection = await crearConexion();
+    const body = parseBody(req.body);
 
     // Verificar que el usuario es policia //
-    const slotNumber = parseInt(req.query.slotNumber || req.body?.slotNumber || "1", 10);
+    const slotNumber = parseInt(req.query.slotNumber || body?.slotNumber || "1", 10);
 
     const [oficialRows] = await connection.execute(
       "SELECT id, stateid, nombre, rol, placa_policial FROM usuarios WHERE discord_id = ? AND slot_number = ? LIMIT 1",
@@ -73,6 +94,11 @@ export default async function handler(req, res) {
           return res.status(404).json({ error: "Ciudadano no encontrado" });
         }
 
+        const ciudadanoData = ciudadano[0];
+        const nivelesVip = parseVipStack(ciudadanoData.nivel_vip);
+        ciudadanoData.nivel_vip = nivelesVip.length > 0 ? nivelesVip.join(", ") : "ninguno";
+        ciudadanoData.niveles_vip = nivelesVip;
+
         const [multas] = await connection.execute(
           "SELECT * FROM multas WHERE stateid_infractor = ? ORDER BY fecha DESC",
           [stateid]
@@ -85,7 +111,7 @@ export default async function handler(req, res) {
 
         return res.status(200).json({
           ok: true,
-          ciudadano: ciudadano[0],
+          ciudadano: ciudadanoData,
           multas,
           cargos
         });
@@ -129,7 +155,6 @@ export default async function handler(req, res) {
     }
 
     // POST: acciones policiales //
-    const body = parseBody(req.body);
     const { accion } = body;
 
     // Imponer multa //
@@ -153,7 +178,7 @@ export default async function handler(req, res) {
       }
 
       await connection.execute(
-        "INSERT INTO multas (stateid_infractor, stateid_oficial, motivo, monto) VALUES (?, ?, ?, ?)",
+        "INSERT INTO multas (stateid_infractor, stateid_oficial, motivo, monto, pagada) VALUES (?, ?, ?, ?, 0)",
         [sanitizar(stateid_infractor), oficial.stateid, sanitizar(motivo), montoNum]
       );
 
@@ -161,7 +186,7 @@ export default async function handler(req, res) {
     }
 
     // Agregar cargo judicial //
-    if (accion === "agregar_cargo") {
+    if (accion === "agregar_cargo" || accion === "imponer_cargo") {
       const { stateid_acusado, cargo, gravedad } = body;
       if (!stateid_acusado || !cargo) {
         return res.status(400).json({ error: "stateid_acusado y cargo requeridos" });

@@ -15,6 +15,34 @@ function parseBody(body) {
   return body;
 }
 
+function parseVipStack(rawValue) {
+  const text = String(rawValue || "").trim();
+  if (!text) return [];
+
+  const values = text
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item && item.toLowerCase() !== "ninguno");
+
+  const unique = [];
+  const seen = new Set();
+  for (const value of values) {
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(value);
+  }
+
+  return unique;
+}
+
+function serializeVipStack(vips) {
+  if (!Array.isArray(vips) || vips.length === 0) {
+    return "ninguno";
+  }
+  return vips.join(",");
+}
+
 function esPeticionWebAdmin(req, body) {
   const host = String(req.headers.host || "").trim().toLowerCase();
   const origin = String(req.headers.origin || "").trim().toLowerCase();
@@ -552,34 +580,109 @@ export default async function handler(req, res) {
     // Asignar nivel VIP //
     if (accion === "asignar_vip") {
       const { stateid, nivel } = body;
-      if (!stateid || !nivel) return res.status(400).json({ error: "stateid y nivel requeridos" });
+      const stateidSanitizado = sanitizar(String(stateid || "")).trim();
+      const nivelSanitizado = sanitizar(String(nivel || "")).trim();
 
-      const [result] = await connection.execute(
-        "UPDATE usuarios SET nivel_vip = ? WHERE stateid = ?",
-        [sanitizar(nivel), sanitizar(stateid)]
+      if (!stateidSanitizado || !nivelSanitizado) {
+        return res.status(400).json({ error: "stateid y nivel requeridos" });
+      }
+
+      if (nivelSanitizado.toLowerCase() === "ninguno") {
+        return res.status(400).json({ error: "No puedes asignar el nivel base 'ninguno'" });
+      }
+
+      const [vipRows] = await connection.execute(
+        "SELECT id FROM niveles_vip WHERE nombre = ? LIMIT 1",
+        [nivelSanitizado]
       );
 
-      if (result.affectedRows === 0) return res.status(404).json({ error: "Personaje no encontrado" });
+      if (vipRows.length === 0) {
+        return res.status(404).json({ error: "Nivel VIP no encontrado" });
+      }
 
-      await registrarLogAdmin(connection, decoded.discordId, `Asigno VIP "${nivel}" a ${stateid}`);
-      return res.status(200).json({ ok: true });
-    }
+      await connection.beginTransaction();
 
-    if (accion === "quitar_vip") {
-      const { stateid } = body;
-      if (!stateid) return res.status(400).json({ error: "stateid requerido" });
-
-      const [result] = await connection.execute(
-        "UPDATE usuarios SET nivel_vip = 'ninguno' WHERE stateid = ?",
-        [sanitizar(stateid)]
+      const [userRows] = await connection.execute(
+        "SELECT id, nivel_vip FROM usuarios WHERE stateid = ? LIMIT 1 FOR UPDATE",
+        [stateidSanitizado]
       );
 
-      if (result.affectedRows === 0) {
+      if (userRows.length === 0) {
+        await connection.rollback();
         return res.status(404).json({ error: "Personaje no encontrado" });
       }
 
-      await registrarLogAdmin(connection, decoded.discordId, `Quito VIP de ${stateid}`, null, "Nivel VIP restablecido a ninguno");
-      return res.status(200).json({ ok: true });
+      const actuales = parseVipStack(userRows[0].nivel_vip);
+      const yaExiste = actuales.some((vip) => vip.toLowerCase() === nivelSanitizado.toLowerCase());
+
+      if (yaExiste) {
+        await connection.rollback();
+        return res.status(400).json({ error: "El usuario ya tiene asignado ese VIP" });
+      }
+
+      if (actuales.length >= 10) {
+        await connection.rollback();
+        return res.status(400).json({ error: "El usuario ya tiene el maximo de 10 VIPs" });
+      }
+
+      const nuevos = [...actuales, nivelSanitizado];
+      await connection.execute(
+        "UPDATE usuarios SET nivel_vip = ? WHERE id = ?",
+        [serializeVipStack(nuevos), userRows[0].id]
+      );
+
+      await connection.commit();
+
+      await registrarLogAdmin(connection, decoded.discordId, `Asigno VIP "${nivelSanitizado}" a ${stateidSanitizado}`, null, `Stack: ${nuevos.join(", ")}`);
+      return res.status(200).json({ ok: true, nivel_vip: serializeVipStack(nuevos), total_vips: nuevos.length });
+    }
+
+    if (accion === "quitar_vip") {
+      const { stateid, nivel } = body;
+      const stateidSanitizado = sanitizar(String(stateid || "")).trim();
+      const nivelSanitizado = sanitizar(String(nivel || "")).trim();
+
+      if (!stateidSanitizado) return res.status(400).json({ error: "stateid requerido" });
+
+      await connection.beginTransaction();
+
+      const [userRows] = await connection.execute(
+        "SELECT id, nivel_vip FROM usuarios WHERE stateid = ? LIMIT 1 FOR UPDATE",
+        [stateidSanitizado]
+      );
+
+      if (userRows.length === 0) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Personaje no encontrado" });
+      }
+
+      const actuales = parseVipStack(userRows[0].nivel_vip);
+      let nuevos = [];
+      let detalle = "Nivel VIP restablecido a ninguno";
+
+      if (nivelSanitizado) {
+        nuevos = actuales.filter((vip) => vip.toLowerCase() !== nivelSanitizado.toLowerCase());
+        if (nuevos.length === actuales.length) {
+          await connection.rollback();
+          return res.status(400).json({ error: "Ese VIP no esta asignado al usuario" });
+        }
+        detalle = nuevos.length > 0
+          ? `Stack restante: ${nuevos.join(", ")}`
+          : "Sin VIPs restantes";
+      }
+
+      await connection.execute(
+        "UPDATE usuarios SET nivel_vip = ? WHERE id = ?",
+        [serializeVipStack(nivelSanitizado ? nuevos : []), userRows[0].id]
+      );
+
+      await connection.commit();
+
+      const accionLog = nivelSanitizado
+        ? `Quito VIP "${nivelSanitizado}" de ${stateidSanitizado}`
+        : `Quito VIP de ${stateidSanitizado}`;
+      await registrarLogAdmin(connection, decoded.discordId, accionLog, null, detalle);
+      return res.status(200).json({ ok: true, nivel_vip: serializeVipStack(nivelSanitizado ? nuevos : []), total_vips: nivelSanitizado ? nuevos.length : 0 });
     }
 
     if (accion === "eliminar_personaje") {
@@ -898,10 +1001,25 @@ export default async function handler(req, res) {
 
       await connection.beginTransaction();
 
-      await connection.execute(
-        "UPDATE usuarios SET nivel_vip = 'ninguno' WHERE nivel_vip = ?",
-        [vipNombre]
+      const [usuariosRows] = await connection.execute(
+        "SELECT id, nivel_vip FROM usuarios WHERE nivel_vip IS NOT NULL AND nivel_vip <> 'ninguno' FOR UPDATE"
       );
+
+      let usuariosAfectados = 0;
+      for (const usuario of usuariosRows) {
+        const stackActual = parseVipStack(usuario.nivel_vip);
+        const stackNuevo = stackActual.filter((vip) => vip.toLowerCase() !== vipNombre.toLowerCase());
+
+        if (stackNuevo.length === stackActual.length) {
+          continue;
+        }
+
+        await connection.execute(
+          "UPDATE usuarios SET nivel_vip = ? WHERE id = ?",
+          [serializeVipStack(stackNuevo), usuario.id]
+        );
+        usuariosAfectados += 1;
+      }
 
       const [result] = await connection.execute(
         "DELETE FROM niveles_vip WHERE nombre = ?",
@@ -914,7 +1032,7 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: "Nivel VIP no encontrado" });
       }
 
-      await registrarLogAdmin(connection, decoded.discordId, `Elimino VIP \"${vipNombre}\"`, null, "Los usuarios afectados pasaron a nivel ninguno");
+      await registrarLogAdmin(connection, decoded.discordId, `Elimino VIP \"${vipNombre}\"`, null, `Usuarios afectados: ${usuariosAfectados}`);
       return res.status(200).json({ ok: true });
     }
 

@@ -3149,6 +3149,13 @@ body::after {
   font-size: 1.3rem;
   font-weight: 700;
 }
+.recompensas-card-subdetalle {
+  margin-top: 10px;
+  display: grid;
+  gap: 4px;
+  color: rgba(255,255,255,0.68);
+  font-size: 0.78rem;
+}
 .recompensas-card-total {
   grid-column: 1 / -1;
   background: linear-gradient(135deg, rgba(249, 115, 22, 0.15), rgba(251, 146, 60, 0.1));
