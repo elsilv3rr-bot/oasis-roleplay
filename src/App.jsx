@@ -887,27 +887,15 @@ useEffect(() => {
 
   const estadoJudicial = multasState.length > 0 ? "CON ANTECEDENTES" : "LIMPIO";
 
-  const pertenenciasKey = `pertenencias_${datos.stateId}`;
+  // ================== PERTENENCIAS ==================
+  const pertenenciasKey = `pertenencias_${datos.nombre}`;
   const defaultPertenencias = { vehiculos: [], documentos: [], mochila: [] };
 
-  const licenciasKey = `licencias_${datos.stateId}`;
-
-  React.useEffect(() => {
-    const oldPertKey = `pertenencias_${datos.nombre}`;
-    const oldLicKey = `licencias_${datos.nombre}`;
-    if (!localStorage.getItem(pertenenciasKey) && localStorage.getItem(oldPertKey)) {
-      localStorage.setItem(pertenenciasKey, localStorage.getItem(oldPertKey));
-    }
-    if (!localStorage.getItem(licenciasKey) && localStorage.getItem(oldLicKey)) {
-      localStorage.setItem(licenciasKey, localStorage.getItem(oldLicKey));
-    }
-  }, [pertenenciasKey, licenciasKey, datos.nombre]);
+  const licenciasKey = `licencias_${datos.nombre}`;
 
 const [licencias, setLicencias] = React.useState(() => {
   const saved = localStorage.getItem(licenciasKey);
-  if (saved) return JSON.parse(saved);
-  const oldSaved = localStorage.getItem(`licencias_${datos.nombre}`);
-  return oldSaved ? JSON.parse(oldSaved) : [];
+  return saved ? JSON.parse(saved) : [];
 });
 
 React.useEffect(() => {
@@ -915,8 +903,7 @@ React.useEffect(() => {
 }, [licencias]);
 
   const [pertenencias, setPertenencias] = React.useState(() => {
-    let saved = localStorage.getItem(pertenenciasKey);
-    if (!saved) saved = localStorage.getItem(`pertenencias_${datos.nombre}`);
+    const saved = localStorage.getItem(pertenenciasKey);
     const parsed = saved ? JSON.parse(saved) : defaultPertenencias;
     return {
       vehiculos: Array.isArray(parsed?.vehiculos) ? parsed.vehiculos : [],
