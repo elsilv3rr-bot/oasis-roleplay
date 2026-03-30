@@ -1649,6 +1649,16 @@ const comprarItem = async () => {
   return (
     <div className="expediente-layout">
 
+      {/* TOAST GLOBAL — fuera de cualquier stacking context para que aparezca sobre el sidebar */}
+      {toast && (
+        <div className={`toast toast-${toast.type}`}>
+          <span className="toast-icon">
+            <AppIcon name={toast.type === "error" ? "close" : "check"} size={16} />
+          </span>
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       {/* BOTON FLOTANTE DE DISCORD (IZQUIERDA) */}
       <div className="discord-flotante">
         <button
@@ -2248,15 +2258,6 @@ const comprarItem = async () => {
 {/* ================= TIENDA OFICIAL ================= */}
 {active === "tienda" && (
   <div className="market-wrap">
-
-    {toast && (
-      <div className={`toast toast-${toast.type}`}>
-        <span className="toast-icon">
-          <AppIcon name={toast.type === "error" ? "close" : "check"} size={16} />
-        </span>
-        <span>{toast.message}</span>
-      </div>
-    )}
 
     <div className="market-header">
       <h1 className="market-title">TIENDA OFICIAL</h1>
