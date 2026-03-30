@@ -2,9 +2,9 @@
 // Multas, cargos judiciales, consulta de matriculas //
 
 import jwt from "jsonwebtoken";
-import { crearConexion, cerrarConexion } from "./_lib/database.js";
-import { aplicarHeaders } from "./_lib/seguridad.js";
-import { sanitizar } from "./_lib/validacion.js";
+import { crearConexion, cerrarConexion } from "../lib/api/database.js";
+import { aplicarHeaders } from "../lib/api/seguridad.js";
+import { sanitizar } from "../lib/api/validacion.js";
 
 function parseBody(body) {
   if (!body) return {};
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
   try {
     connection = await crearConexion();
 
-    // Verificar que el usuario es policia (tiene placa o rol policia) //
+    // Verificar que el usuario es policia //
     const slotNumber = parseInt(req.query.slotNumber || req.body?.slotNumber || "1", 10);
 
     const [oficialRows] = await connection.execute(
@@ -51,8 +51,8 @@ export default async function handler(req, res) {
 
     const oficial = oficialRows[0];
 
-    if (oficial.rol !== "policia" || !oficial.placa_policial) {
-      return res.status(403).json({ error: "No tienes acceso policial. Necesitas rol de policia y placa asignada." });
+    if (oficial.rol !== "policia") {
+      return res.status(403).json({ error: "No tienes acceso policial. Necesitas rol de policia." });
     }
 
     // GET: consultas //

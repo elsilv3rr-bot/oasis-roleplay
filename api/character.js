@@ -1,15 +1,15 @@
 // REGISTRO DE PERSONAJE //
 
 import jwt from "jsonwebtoken";
-import { crearConexion, cerrarConexion } from "./_lib/database.js";
-import { aplicarHeaders } from "./_lib/seguridad.js";
-import { sanitizar } from "./_lib/validacion.js";
+import { crearConexion, cerrarConexion } from "../lib/api/database.js";
+import { aplicarHeaders } from "../lib/api/seguridad.js";
+import { sanitizar } from "../lib/api/validacion.js";
 import {
   getPrimaryCharacter,
   getUserCharacterSlots,
   parseSlotNumber,
   ensureUserSlotsInitialized,
-} from "./_lib/characterSlots.js";
+} from "../lib/api/characterSlots.js";
 
 const START_MONEY = 20000;
 

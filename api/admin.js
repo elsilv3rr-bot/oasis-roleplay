@@ -2,10 +2,10 @@
 // Todas las operaciones requieren ser admin verificado por discord_id //
 
 import jwt from "jsonwebtoken";
-import { crearConexion, cerrarConexion } from "./_lib/database.js";
-import { aplicarHeaders } from "./_lib/seguridad.js";
-import { sanitizar } from "./_lib/validacion.js";
-import { ensureUserSlotsInitialized, parseSlotNumber } from "./_lib/characterSlots.js";
+import { crearConexion, cerrarConexion } from "../lib/api/database.js";
+import { aplicarHeaders } from "../lib/api/seguridad.js";
+import { sanitizar } from "../lib/api/validacion.js";
+import { ensureUserSlotsInitialized, parseSlotNumber } from "../lib/api/characterSlots.js";
 
 function parseBody(body) {
   if (!body) return {};
@@ -93,6 +93,69 @@ export default async function handler(req, res) {
         query += " ORDER BY u.id DESC LIMIT 50";
         const [rows] = await connection.execute(query, params);
         return res.status(200).json({ ok: true, usuarios: rows });
+      }
+
+      if (accion === "usuarios_registrados") {
+        const busqueda = sanitizar(String(req.query.busqueda || "")).trim();
+
+        let perfilesQuery = `
+          SELECT u.discord_id, u.username, u.avatar, u.created_at,
+                 COUNT(p.id) AS total_personajes
+          FROM users u
+          LEFT JOIN usuarios p ON p.discord_id = u.discord_id
+        `;
+        const perfilesParams = [];
+
+        if (busqueda) {
+          perfilesQuery += " WHERE u.username LIKE ? OR u.discord_id LIKE ? OR p.nombre LIKE ? OR p.stateid LIKE ?";
+          const term = `%${busqueda}%`;
+          perfilesParams.push(term, term, term, term);
+        }
+
+        perfilesQuery += " GROUP BY u.discord_id, u.username, u.avatar, u.created_at ORDER BY u.created_at DESC LIMIT 250";
+
+        const [perfiles] = await connection.execute(perfilesQuery, perfilesParams);
+        if (perfiles.length === 0) {
+          return res.status(200).json({ ok: true, perfiles: [] });
+        }
+
+        const discordIds = perfiles.map((p) => String(p.discord_id));
+        const placeholders = discordIds.map(() => "?").join(",");
+
+        const [personajesRows] = await connection.execute(
+          `SELECT id, discord_id, slot_number, stateid, nombre, edad, nacionalidad, rol, nivel_vip, dinero, placa_policial, created_at
+           FROM usuarios
+           WHERE discord_id IN (${placeholders})
+           ORDER BY discord_id ASC, slot_number ASC`,
+          discordIds
+        );
+
+        const personajesPorDiscord = new Map();
+        for (const personaje of personajesRows) {
+          const key = String(personaje.discord_id);
+          if (!personajesPorDiscord.has(key)) personajesPorDiscord.set(key, []);
+          personajesPorDiscord.get(key).push(personaje);
+        }
+
+        const perfilesConPersonajes = perfiles.map((perfil) => ({
+          ...perfil,
+          total_personajes: Number(perfil.total_personajes || 0),
+          personajes: personajesPorDiscord.get(String(perfil.discord_id)) || [],
+        }));
+
+        return res.status(200).json({ ok: true, perfiles: perfilesConPersonajes });
+      }
+
+      if (accion === "mercado_stock") {
+        const [vehiculos] = await connection.execute(
+          "SELECT id_vehiculo AS id, nombre, precio_actual AS precio, stock_global AS stock, imagen_url AS imagen FROM vehiculos_tienda ORDER BY id_vehiculo ASC"
+        );
+
+        const [items] = await connection.execute(
+          "SELECT id_item AS id, tipo, nombre, precio_actual AS precio, stock_global AS stock, imagen_url AS imagen FROM mercado_items ORDER BY tipo ASC, id_item ASC"
+        );
+
+        return res.status(200).json({ ok: true, vehiculos, items });
       }
 
       if (accion === "profesiones") {
@@ -314,6 +377,23 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    if (accion === "quitar_rol") {
+      const { stateid } = body;
+      if (!stateid) return res.status(400).json({ error: "stateid requerido" });
+
+      const [result] = await connection.execute(
+        "UPDATE usuarios SET rol = 'civil', placa_policial = NULL WHERE stateid = ?",
+        [sanitizar(stateid)]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Personaje no encontrado" });
+      }
+
+      await registrarLogAdmin(connection, decoded.discordId, `Quito rol especial de ${stateid}`, null, "Rol restablecido a civil");
+      return res.status(200).json({ ok: true });
+    }
+
     // Asignar placa policial //
     if (accion === "asignar_placa") {
       const { stateid, placa } = body;
@@ -344,6 +424,221 @@ export default async function handler(req, res) {
 
       await registrarLogAdmin(connection, decoded.discordId, `Asigno VIP "${nivel}" a ${stateid}`);
       return res.status(200).json({ ok: true });
+    }
+
+    if (accion === "quitar_vip") {
+      const { stateid } = body;
+      if (!stateid) return res.status(400).json({ error: "stateid requerido" });
+
+      const [result] = await connection.execute(
+        "UPDATE usuarios SET nivel_vip = 'ninguno' WHERE stateid = ?",
+        [sanitizar(stateid)]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Personaje no encontrado" });
+      }
+
+      await registrarLogAdmin(connection, decoded.discordId, `Quito VIP de ${stateid}`, null, "Nivel VIP restablecido a ninguno");
+      return res.status(200).json({ ok: true });
+    }
+
+    if (accion === "eliminar_personaje") {
+      const stateid = sanitizar(String(body.stateid || "")).trim();
+      const personajeId = Number(body.personaje_id);
+
+      if (!stateid && !personajeId) {
+        return res.status(400).json({ error: "Debes enviar stateid o personaje_id" });
+      }
+
+      await connection.beginTransaction();
+
+      let rows;
+      if (personajeId) {
+        [rows] = await connection.execute(
+          "SELECT id, discord_id, slot_number, stateid, nombre FROM usuarios WHERE id = ? LIMIT 1 FOR UPDATE",
+          [personajeId]
+        );
+      } else {
+        [rows] = await connection.execute(
+          "SELECT id, discord_id, slot_number, stateid, nombre FROM usuarios WHERE stateid = ? LIMIT 1 FOR UPDATE",
+          [stateid]
+        );
+      }
+
+      if (rows.length === 0) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Personaje no encontrado" });
+      }
+
+      const personaje = rows[0];
+
+      await connection.execute(
+        "DELETE FROM inventario WHERE discord_id = ? AND slot_number = ?",
+        [personaje.discord_id, Number(personaje.slot_number)]
+      );
+
+      await connection.execute(
+        "DELETE FROM recompensas_diarias WHERE discord_id = ? AND slot_number = ?",
+        [personaje.discord_id, Number(personaje.slot_number)]
+      );
+
+      await connection.execute(
+        "DELETE FROM crypto_billeteras WHERE discord_id = ? AND slot_number = ?",
+        [personaje.discord_id, Number(personaje.slot_number)]
+      );
+
+      await connection.execute(
+        "DELETE FROM crypto_movimientos WHERE discord_id = ? AND slot_number = ?",
+        [personaje.discord_id, Number(personaje.slot_number)]
+      );
+
+      await connection.execute(
+        "DELETE FROM casino_jugadas WHERE discord_id = ? AND slot_number = ?",
+        [personaje.discord_id, Number(personaje.slot_number)]
+      );
+
+      await connection.execute(
+        "DELETE FROM multas WHERE stateid_infractor = ? OR stateid_oficial = ?",
+        [personaje.stateid, personaje.stateid]
+      );
+
+      await connection.execute(
+        "DELETE FROM cargos_judiciales WHERE stateid_acusado = ? OR stateid_oficial = ?",
+        [personaje.stateid, personaje.stateid]
+      );
+
+      await connection.execute(
+        "DELETE FROM vehiculos_registrados WHERE stateid_propietario = ?",
+        [personaje.stateid]
+      );
+
+      await connection.execute("DELETE FROM usuarios WHERE id = ?", [personaje.id]);
+
+      await connection.commit();
+
+      await registrarLogAdmin(
+        connection,
+        decoded.discordId,
+        `Elimino personaje ${personaje.stateid}`,
+        personaje.discord_id,
+        `Nombre: ${personaje.nombre} · Slot: ${personaje.slot_number}`
+      );
+
+      return res.status(200).json({ ok: true });
+    }
+
+    if (accion === "eliminar_perfil") {
+      const discordIdObjetivo = sanitizar(String(body.discord_id || "")).trim();
+      if (!discordIdObjetivo) {
+        return res.status(400).json({ error: "discord_id requerido" });
+      }
+
+      await connection.beginTransaction();
+
+      const [personajesRows] = await connection.execute(
+        "SELECT id, stateid, slot_number, nombre FROM usuarios WHERE discord_id = ? FOR UPDATE",
+        [discordIdObjetivo]
+      );
+
+      await connection.execute("DELETE FROM inventario WHERE discord_id = ?", [discordIdObjetivo]);
+      await connection.execute("DELETE FROM recompensas_diarias WHERE discord_id = ?", [discordIdObjetivo]);
+      await connection.execute("DELETE FROM crypto_billeteras WHERE discord_id = ?", [discordIdObjetivo]);
+      await connection.execute("DELETE FROM crypto_movimientos WHERE discord_id = ?", [discordIdObjetivo]);
+      await connection.execute("DELETE FROM casino_jugadas WHERE discord_id = ?", [discordIdObjetivo]);
+      await connection.execute("DELETE FROM casino_accesos WHERE discord_id = ?", [discordIdObjetivo]);
+      await connection.execute("DELETE FROM user_character_slots WHERE discord_id = ?", [discordIdObjetivo]);
+      await connection.execute("DELETE FROM admins WHERE discord_id = ?", [discordIdObjetivo]);
+
+      const stateids = personajesRows.map((p) => String(p.stateid || "")).filter(Boolean);
+      if (stateids.length > 0) {
+        const placeholders = stateids.map(() => "?").join(",");
+        await connection.execute(
+          `DELETE FROM multas WHERE stateid_infractor IN (${placeholders}) OR stateid_oficial IN (${placeholders})`,
+          [...stateids, ...stateids]
+        );
+        await connection.execute(
+          `DELETE FROM cargos_judiciales WHERE stateid_acusado IN (${placeholders}) OR stateid_oficial IN (${placeholders})`,
+          [...stateids, ...stateids]
+        );
+        await connection.execute(
+          `DELETE FROM vehiculos_registrados WHERE stateid_propietario IN (${placeholders})`,
+          stateids
+        );
+      }
+
+      await connection.execute("DELETE FROM usuarios WHERE discord_id = ?", [discordIdObjetivo]);
+      await connection.execute("DELETE FROM users WHERE discord_id = ?", [discordIdObjetivo]);
+
+      await connection.commit();
+
+      await registrarLogAdmin(
+        connection,
+        decoded.discordId,
+        `Elimino perfil completo ${discordIdObjetivo}`,
+        discordIdObjetivo,
+        `Personajes eliminados: ${personajesRows.length}`
+      );
+
+      return res.status(200).json({ ok: true, personajesEliminados: personajesRows.length });
+    }
+
+    if (accion === "ajustar_stock_vehiculo") {
+      const vehiculoId = Number(body.vehiculo_id);
+      const delta = Math.floor(Number(body.delta));
+
+      if (!vehiculoId || !delta) {
+        return res.status(400).json({ error: "vehiculo_id y delta requeridos" });
+      }
+
+      const [rows] = await connection.execute(
+        "SELECT stock_global, nombre FROM vehiculos_tienda WHERE id_vehiculo = ? LIMIT 1",
+        [vehiculoId]
+      );
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: "Vehiculo no encontrado" });
+      }
+
+      const actual = Number(rows[0].stock_global || 0);
+      const nuevo = Math.max(0, actual + delta);
+
+      await connection.execute(
+        "UPDATE vehiculos_tienda SET stock_global = ? WHERE id_vehiculo = ?",
+        [nuevo, vehiculoId]
+      );
+
+      await registrarLogAdmin(connection, decoded.discordId, `Ajusto stock vehiculo ${vehiculoId}`, null, `${rows[0].nombre}: ${actual} -> ${nuevo}`);
+      return res.status(200).json({ ok: true, stock: nuevo });
+    }
+
+    if (accion === "ajustar_stock_item") {
+      const itemId = Number(body.item_id);
+      const delta = Math.floor(Number(body.delta));
+
+      if (!itemId || !delta) {
+        return res.status(400).json({ error: "item_id y delta requeridos" });
+      }
+
+      const [rows] = await connection.execute(
+        "SELECT stock_global, nombre, tipo FROM mercado_items WHERE id_item = ? LIMIT 1",
+        [itemId]
+      );
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: "Item no encontrado" });
+      }
+
+      const actual = Number(rows[0].stock_global || 0);
+      const nuevo = Math.max(0, actual + delta);
+
+      await connection.execute(
+        "UPDATE mercado_items SET stock_global = ? WHERE id_item = ?",
+        [nuevo, itemId]
+      );
+
+      await registrarLogAdmin(connection, decoded.discordId, `Ajusto stock item ${itemId}`, null, `${rows[0].tipo}/${rows[0].nombre}: ${actual} -> ${nuevo}`);
+      return res.status(200).json({ ok: true, stock: nuevo });
     }
 
     // Agregar admin //

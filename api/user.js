@@ -2,7 +2,7 @@
 // get /api/user //
 // Verifica el jwt y retorna los datos del usuario //
 
-import { aplicarHeaders } from "./_lib/seguridad.js";
+import { aplicarHeaders } from "../lib/api/seguridad.js";
 import jwt from "jsonwebtoken";
 
 export default function handler(req, res) {

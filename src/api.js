@@ -437,6 +437,19 @@ async function obtenerCatalogoVehiculos() {
   return data;
 }
 
+async function obtenerItemsMercado() {
+  const token = getToken();
+  if (!token) return { items: [] };
+
+  const res = await fetch(`${API_URL}/banco?accion=tienda_items`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al obtener items del mercado");
+  return data;
+}
+
 async function sincronizarCatalogoVehiculos(vehiculos) {
   const token = getToken();
   if (!token) throw new Error("Sesion expirada");
@@ -455,6 +468,24 @@ async function sincronizarCatalogoVehiculos(vehiculos) {
   return data;
 }
 
+async function sincronizarItemsMercado(items) {
+  const token = getToken();
+  if (!token) throw new Error("Sesion expirada");
+
+  const res = await fetch(`${API_URL}/banco`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ action: "tienda_sincronizar_items", items }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al sincronizar items");
+  return data;
+}
+
 async function comprarVehiculoTienda(vehiculoId, slotNumber = 1) {
   const token = getToken();
   if (!token) throw new Error("Sesion expirada");
@@ -470,6 +501,24 @@ async function comprarVehiculoTienda(vehiculoId, slotNumber = 1) {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Error al comprar vehiculo");
+  return data;
+}
+
+async function comprarItemTienda(itemId, slotNumber = 1) {
+  const token = getToken();
+  if (!token) throw new Error("Sesion expirada");
+
+  const res = await fetch(`${API_URL}/banco`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ action: "tienda_comprar_item", itemId, slotNumber }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al comprar item");
   return data;
 }
 
@@ -584,8 +633,11 @@ export {
   pagarMultaDB,
   pagarTodasMultasDB,
   obtenerCatalogoVehiculos,
+  obtenerItemsMercado,
   sincronizarCatalogoVehiculos,
+  sincronizarItemsMercado,
   comprarVehiculoTienda,
+  comprarItemTienda,
   obtenerEstadoCasino,
   comprarEntradaCasino,
   jugarCasino,

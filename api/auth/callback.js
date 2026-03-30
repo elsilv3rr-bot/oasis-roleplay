@@ -4,8 +4,8 @@
 // Crea o actualiza el usuario en la base de datos //
 // Genera un jwt y redirige al frontend //
 
-import { crearConexion, cerrarConexion } from "../_lib/database.js";
-import { aplicarHeaders } from "../_lib/seguridad.js";
+import { crearConexion, cerrarConexion } from "../../lib/api/database.js";
+import { aplicarHeaders } from "../../lib/api/seguridad.js";
 import jwt from "jsonwebtoken";
 
 export default async function handler(req, res) {

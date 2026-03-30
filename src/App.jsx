@@ -1,7 +1,7 @@
 import React from "react"
 import { useState, useEffect } from "react"
 import { Routes, Route, useNavigate, useSearchParams } from "react-router-dom"
-import { iniciarLoginDiscord, obtenerSlotsPersonajes, desbloquearSlotPersonaje, obtenerUsuario, registrarPersonaje, setToken, cerrarSesion, obtenerSaldoDB, transferirDineroDB, debitarDineroDB, verificarAdmin, obtenerDatosAdmin, accionAdmin, consultaPolicial, accionPolicial, obtenerRecompensaDiaria, cobrarRecompensaDiaria, registrarVehiculoDB, obtenerMultasDB, pagarMultaDB, pagarTodasMultasDB, obtenerCatalogoVehiculos, sincronizarCatalogoVehiculos, comprarVehiculoTienda, obtenerEstadoCasino, comprarEntradaCasino, jugarCasino, obtenerEstadoCrypto, operarCrypto } from "./api"
+import { iniciarLoginDiscord, obtenerSlotsPersonajes, desbloquearSlotPersonaje, obtenerUsuario, registrarPersonaje, setToken, cerrarSesion, obtenerSaldoDB, transferirDineroDB, verificarAdmin, obtenerDatosAdmin, accionAdmin, consultaPolicial, accionPolicial, obtenerRecompensaDiaria, cobrarRecompensaDiaria, registrarVehiculoDB, obtenerMultasDB, pagarMultaDB, pagarTodasMultasDB, obtenerCatalogoVehiculos, obtenerItemsMercado, sincronizarCatalogoVehiculos, sincronizarItemsMercado, comprarVehiculoTienda, comprarItemTienda, obtenerEstadoCasino, comprarEntradaCasino, jugarCasino, obtenerEstadoCrypto, operarCrypto } from "./api"
 import "./App.css"
 
 function AppIcon({ name, size = 20, className = "" }) {
@@ -748,17 +748,17 @@ const secciones = [
     { id: 54, nombre: "Vellfire R1", precio: 18500, stock: 20, imagen: "/autos/R1.png" },
     { id: 55, nombre: "Falcon Grinder", precio: 30000, stock: 100, imagen: "/autos/raptor-citizen.png" },
   ]);
-  const documentosTienda = [
-  { id: 1, nombre: "Licencia de Conducir", precio: 1500, imagen: "/licencias/licencia.png" },
-  { id: 2, nombre: "Licencia de Motos", precio: 1000, imagen: "/licencias/licencia.png" },
-  { id: 3, nombre: "Licencia de Camiones", precio: 2000, imagen: "/licencias/licencia.png" },
-  { id: 4, nombre: "Licencia de Buses", precio: 1500, imagen: "/licencias/licencia.png" },
-  { id: 5, nombre: "Licencia de Tractor", precio: 1500, imagen: "/licencias/licencia.png" },
-  { id: 6, nombre: "Licencia de Armas", precio: 2500, imagen: "/licencias/licencia.png" },
-];
-const armasTienda = [
-  { id: 1, nombre: "Glock  17", precio: 15000, imagen: "/armas/glock.png" },
-];
+  const [documentosTienda, setDocumentosTienda] = React.useState([
+    { id: 1, tipo: "documento", nombre: "Licencia de Conducir", precio: 1500, stock: 9999, imagen: "/licencias/licencia.png" },
+    { id: 2, tipo: "documento", nombre: "Licencia de Motos", precio: 1000, stock: 9999, imagen: "/licencias/licencia.png" },
+    { id: 3, tipo: "documento", nombre: "Licencia de Camiones", precio: 2000, stock: 9999, imagen: "/licencias/licencia.png" },
+    { id: 4, tipo: "documento", nombre: "Licencia de Buses", precio: 1500, stock: 9999, imagen: "/licencias/licencia.png" },
+    { id: 5, tipo: "documento", nombre: "Licencia de Tractor", precio: 1500, stock: 9999, imagen: "/licencias/licencia.png" },
+    { id: 6, tipo: "documento", nombre: "Licencia de Armas", precio: 2500, stock: 9999, imagen: "/licencias/licencia.png" },
+  ]);
+  const [armasTienda, setArmasTienda] = React.useState([
+    { id: 101, tipo: "arma", nombre: "Glock 17", precio: 15000, stock: 9999, imagen: "/armas/glock.png" },
+  ]);
 
 const idsVehiculosLujo = React.useMemo(
   () => new Set([31, 32, 34, 35, 36, 37, 38, 41, 42, 43, 44, 46, 48, 49, 50, 51]),
@@ -779,6 +779,8 @@ const aplicarAjusteLujo = React.useCallback(
 
 const stockPrevioRef = React.useRef(null);
 const catalogoBaseRef = React.useRef(null);
+const itemsPrevioRef = React.useRef(null);
+const itemsBaseRef = React.useRef(null);
 
 const cargarCatalogoVehiculos = React.useCallback(async () => {
   const catalogoAjustado = catalogoBaseRef.current || aplicarAjusteLujo(vehiculosTienda);
@@ -808,16 +810,39 @@ const cargarCatalogoVehiculos = React.useCallback(async () => {
   setVehiculosTienda(lista);
 }, [aplicarAjusteLujo]);
 
+const cargarItemsMercado = React.useCallback(async () => {
+  const itemsBase = itemsBaseRef.current || [...documentosTienda, ...armasTienda];
+  if (!itemsBaseRef.current) {
+    itemsBaseRef.current = itemsBase;
+  }
+
+  await sincronizarItemsMercado(itemsBase);
+  const data = await obtenerItemsMercado();
+  const lista = Array.isArray(data?.items) ? data.items : itemsBase;
+
+  const docs = lista.filter((item) => String(item.tipo) === "documento");
+  const armas = lista.filter((item) => String(item.tipo) === "arma");
+
+  itemsPrevioRef.current = lista;
+  setDocumentosTienda(docs);
+  setArmasTienda(armas);
+}, []);
+
 React.useEffect(() => {
   cargarCatalogoVehiculos().catch(() => {});
 }, []);
 
 React.useEffect(() => {
+  cargarItemsMercado().catch(() => {});
+}, [cargarItemsMercado]);
+
+React.useEffect(() => {
   const id = setInterval(() => {
     cargarCatalogoVehiculos().catch(() => {});
+    cargarItemsMercado().catch(() => {});
   }, 20000);
   return () => clearInterval(id);
-}, [cargarCatalogoVehiculos]);
+}, [cargarCatalogoVehiculos, cargarItemsMercado]);
 
 const registrarLogAdmin = (accion) => {
   const logs = JSON.parse(localStorage.getItem("admin_logs")) || [];
@@ -1096,6 +1121,7 @@ const comprarVehiculo = async () => {
 
       const nuevoVehiculo = {
         id: Date.now(),
+        itemUid: result?.vehiculo?.itemUid,
         nombre: result?.vehiculo?.nombre || compraSeleccionada.nombre,
         precio: Number(result?.vehiculo?.precio || precio),
         imagen: result?.vehiculo?.imagen || compraSeleccionada.imagen,
@@ -1152,7 +1178,7 @@ const comprarDocumento = async () => {
 
     let result;
     try {
-      result = await debitarDineroDB(precio, datos.slotNumber || 1);
+      result = await comprarItemTienda(compraSeleccionada.id, datos.slotNumber || 1);
     } catch (err) {
       return alert(err.message || "Error al procesar el pago.");
     }
@@ -1171,6 +1197,7 @@ const comprarDocumento = async () => {
     const nuevoDoc = {
       id: Date.now(),
       tipo: compraSeleccionada.nombre,
+      itemUid: result?.item?.itemUid,
       emitida: new Date().toLocaleDateString("es-US"),
       vence: "Indefinido",
     };
@@ -1179,6 +1206,8 @@ const comprarDocumento = async () => {
       ...prev,
       documentos: [...(prev.documentos || []), nuevoDoc],
     }));
+
+    await cargarItemsMercado();
 
     // Toast
     setToast({
@@ -1217,7 +1246,7 @@ const comprarArma = async () => {
 
     let result;
     try {
-      result = await debitarDineroDB(precio, datos.slotNumber || 1);
+      result = await comprarItemTienda(compraSeleccionada.id, datos.slotNumber || 1);
     } catch (err) {
       return alert(err.message || "Error al procesar el pago.");
     }
@@ -1237,12 +1266,15 @@ const comprarArma = async () => {
       id: Date.now(),
       nombre: compraSeleccionada.nombre,
       tipo: "arma",
+      itemUid: result?.item?.itemUid,
     };
 
     setPertenencias((prev) => ({
       ...prev,
       mochila: [...(prev.mochila || []), nuevaArma],
     }));
+
+    await cargarItemsMercado();
 
     setToast({
       type: "success",
@@ -1294,7 +1326,7 @@ const comprarItem = async () => {
 
   let result;
   try {
-    result = await debitarDineroDB(precio, datos.slotNumber || 1);
+    result = await comprarItemTienda(compraSeleccionada.id, datos.slotNumber || 1);
   } catch (err) {
     return alert(err.message || "Error al procesar el pago.");
   }
@@ -1986,6 +2018,7 @@ const comprarItem = async () => {
                         <div key={v.id} className="vehiculo-card">
   <div><strong>{v.nombre}</strong></div>
   <div>{formatUSD(v.precio)}</div>
+  {v.itemUid ? <div style={{ marginTop: 4, fontSize: 12 }}><strong>ID Mercado:</strong> {v.itemUid}</div> : null}
   <div style={{ marginTop: 6, fontSize: 12, opacity: 0.9 }}>
     Estado: <strong>{v.estado}</strong>
     {v.patente ? <> · Patente: <strong>{v.patente}</strong></> : null}
@@ -2006,6 +2039,7 @@ const comprarItem = async () => {
       (pertenencias.documentos || []).map((doc) => (
         <div key={doc.id} className="doc-card">
           <h3>{doc.tipo}</h3>
+          {doc.itemUid ? <p><strong>ID Mercado:</strong> {doc.itemUid}</p> : null}
           <p><strong>Nombre:</strong> {datos.nombre}</p>
           <p><strong>StateID:</strong> {datos.stateId}</p>
           <p><strong>Emitida:</strong> {doc.emitida}</p>
@@ -2031,6 +2065,7 @@ const comprarItem = async () => {
 
   <div className="vehicle-info">
     <h3>{item.nombre}</h3>
+    {item.itemUid ? <p className="stock">ID Mercado: {item.itemUid}</p> : null}
   </div>
 </div>
         ))
@@ -2312,6 +2347,7 @@ const comprarItem = async () => {
 
               <div className="vehicle-info">
                 <h3>{doc.nombre}</h3>
+                <p className="stock">Stock: {doc.stock}</p>
 
                 <div className="vehicle-footer">
                   <span className="vehicle-price">
@@ -2321,6 +2357,7 @@ const comprarItem = async () => {
                   <button
                     className="buy-btn"
                     aria-label={`Comprar ${doc.nombre}`}
+                    disabled={Number(doc.stock) <= 0}
                     onClick={() =>
                       setCompraSeleccionada({
                         ...doc,
@@ -2383,6 +2420,7 @@ const comprarItem = async () => {
 
               <div className="vehicle-info">
                 <h3>{arma.nombre}</h3>
+                <p className="stock">Stock: {arma.stock}</p>
 
                 <div className="vehicle-footer">
                   <span className="vehicle-price">
@@ -2392,6 +2430,7 @@ const comprarItem = async () => {
                   <button
                     className="buy-btn"
                     aria-label={`Comprar ${arma.nombre}`}
+                    disabled={Number(arma.stock) <= 0}
                     onClick={() =>
                       setCompraSeleccionada({
                         ...arma,
@@ -2958,7 +2997,12 @@ function AdminPanel({ discordId }) {
   const [admins, setAdmins] = React.useState([]);
   const [niveles, setNiveles] = React.useState([]);
   const [logs, setLogs] = React.useState([]);
+  const [perfiles, setPerfiles] = React.useState([]);
+  const [vehiculosStock, setVehiculosStock] = React.useState([]);
+  const [itemsStock, setItemsStock] = React.useState([]);
   const [mensaje, setMensaje] = React.useState(null);
+  const [adminBusquedaUsuarios, setAdminBusquedaUsuarios] = React.useState("");
+  const [usuariosCargados, setUsuariosCargados] = React.useState(false);
 
   // Campos de accion //
   const [stateidObjetivo, setStateidObjetivo] = React.useState("");
@@ -2977,6 +3021,10 @@ function AdminPanel({ discordId }) {
   const [multaMotivoAdmin, setMultaMotivoAdmin] = React.useState("");
   const [multaMontoAdmin, setMultaMontoAdmin] = React.useState("");
   const [multaIdQuitarAdmin, setMultaIdQuitarAdmin] = React.useState("");
+  const [vehiculoStockId, setVehiculoStockId] = React.useState("");
+  const [vehiculoStockDelta, setVehiculoStockDelta] = React.useState("1");
+  const [itemStockId, setItemStockId] = React.useState("");
+  const [itemStockDelta, setItemStockDelta] = React.useState("1");
 
   // Campos profesion //
   const [nuevaProfNombre, setNuevaProfNombre] = React.useState("");
@@ -3017,11 +3065,33 @@ function AdminPanel({ discordId }) {
     } catch {}
   };
 
+  const cargarUsuariosRegistrados = async (busqueda = "") => {
+    try {
+      const extra = busqueda ? `&busqueda=${encodeURIComponent(busqueda)}` : "";
+      const data = await obtenerDatosAdmin("usuarios_registrados", extra);
+      setPerfiles(Array.isArray(data?.perfiles) ? data.perfiles : []);
+      setUsuariosCargados(true);
+    } catch (err) {
+      setMensaje({ tipo: "error", texto: err.message });
+    }
+  };
+
+  const cargarStockMercado = async () => {
+    try {
+      const data = await obtenerDatosAdmin("mercado_stock");
+      setVehiculosStock(Array.isArray(data?.vehiculos) ? data.vehiculos : []);
+      setItemsStock(Array.isArray(data?.items) ? data.items : []);
+    } catch (err) {
+      setMensaje({ tipo: "error", texto: err.message });
+    }
+  };
+
   React.useEffect(() => {
     cargarProfesiones();
     cargarAdmins();
     cargarNiveles();
     cargarLogs();
+    cargarStockMercado();
   }, []);
 
   const ejecutarAccion = async (accion, payload) => {
@@ -3034,6 +3104,10 @@ function AdminPanel({ discordId }) {
       if (accion.includes("profesion")) cargarProfesiones();
       if (accion.includes("admin")) cargarAdmins();
       if (accion.includes("vip")) cargarNiveles();
+      if (accion.includes("stock")) cargarStockMercado();
+      if (accion.includes("eliminar_personaje") || accion.includes("eliminar_perfil")) {
+        if (usuariosCargados) cargarUsuariosRegistrados(adminBusquedaUsuarios);
+      }
       cargarLogs();
     } catch (err) {
       setMensaje({ tipo: "error", texto: err.message });
@@ -3064,6 +3138,7 @@ function AdminPanel({ discordId }) {
       <div className="admin-tabs">
         {[
           { id: "usuarios", label: "Usuarios" },
+          { id: "administracion", label: "Administración" },
           { id: "profesiones", label: "Profesiones" },
           { id: "vip", label: "Niveles VIP" },
           { id: "admins", label: "Administradores" },
@@ -3141,6 +3216,7 @@ function AdminPanel({ discordId }) {
                   {profesiones.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
                 </select>
                 <button className="admin-btn" onClick={() => { ejecutarAccionUsuario("asignar_rol", { rol: rolAsignar }); }}>Asignar</button>
+                <button className="admin-btn-danger" onClick={() => { ejecutarAccionUsuario("quitar_rol"); }}>Quitar Rol</button>
               </div>
             </div>
 
@@ -3160,6 +3236,7 @@ function AdminPanel({ discordId }) {
                   {niveles.map(n => <option key={n.id} value={n.nombre}>{n.nombre} (+${n.recompensa_diaria})</option>)}
                 </select>
                 <button className="admin-btn" onClick={() => { ejecutarAccionUsuario("asignar_vip", { nivel: vipAsignar }); }}>Asignar VIP</button>
+                <button className="admin-btn-danger" onClick={() => { ejecutarAccionUsuario("quitar_vip"); }}>Quitar VIP</button>
               </div>
             </div>
 
@@ -3232,6 +3309,117 @@ function AdminPanel({ discordId }) {
                 }}>Quitar Multa</button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {tab === "administracion" && (
+        <div className="admin-seccion">
+          <div className="admin-acciones">
+            <h3>Gestión de perfiles y personajes</h3>
+            <div className="admin-accion-grupo">
+              <h4>Cargar usuarios registrados</h4>
+              <div className="admin-input-row">
+                <input
+                  placeholder="Buscar por username, discord_id, nombre o stateID"
+                  value={adminBusquedaUsuarios}
+                  onChange={(e) => setAdminBusquedaUsuarios(e.target.value)}
+                />
+                <button className="admin-btn" onClick={() => cargarUsuariosRegistrados(adminBusquedaUsuarios)}>
+                  Cargar
+                </button>
+              </div>
+            </div>
+
+            {usuariosCargados && (
+              <div className="admin-lista">
+                {perfiles.length === 0 ? (
+                  <div className="admin-list-item">Sin resultados.</div>
+                ) : (
+                  perfiles.map((perfil) => (
+                    <div key={perfil.discord_id} className="admin-list-item">
+                      <div>
+                        <strong>{perfil.username || "Sin username"}</strong> · {perfil.discord_id}
+                      </div>
+                      <div className="admin-list-desc">Personajes: {Number(perfil.total_personajes || 0)}</div>
+                      <button
+                        className="admin-btn-danger"
+                        onClick={() => ejecutarAccion("eliminar_perfil", { discord_id: perfil.discord_id })}
+                      >
+                        Borrar Perfil Completo
+                      </button>
+
+                      {(perfil.personajes || []).map((p) => (
+                        <div key={p.id} className="admin-list-desc" style={{ marginTop: 8 }}>
+                          <strong>{p.nombre}</strong> · StateID {p.stateid} · Slot {p.slot_number} · Rol {p.rol} · VIP {p.nivel_vip}
+                          <button
+                            className="admin-btn-danger"
+                            style={{ marginLeft: 8 }}
+                            onClick={() => ejecutarAccion("eliminar_personaje", { personaje_id: p.id })}
+                          >
+                            Borrar Personaje
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="admin-acciones">
+            <h3>Stock de mercado</h3>
+
+            <div className="admin-accion-grupo">
+              <h4>Vehículos</h4>
+              <div className="admin-input-row">
+                <select value={vehiculoStockId} onChange={(e) => setVehiculoStockId(e.target.value)}>
+                  <option value="">Seleccionar vehículo</option>
+                  {vehiculosStock.map((v) => (
+                    <option key={v.id} value={v.id}>{v.nombre} (Stock: {v.stock})</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  value={vehiculoStockDelta}
+                  onChange={(e) => setVehiculoStockDelta(e.target.value)}
+                  placeholder="Delta"
+                />
+                <button
+                  className="admin-btn"
+                  onClick={() => ejecutarAccion("ajustar_stock_vehiculo", { vehiculo_id: Number(vehiculoStockId), delta: Number(vehiculoStockDelta) })}
+                >
+                  Ajustar Stock
+                </button>
+              </div>
+            </div>
+
+            <div className="admin-accion-grupo">
+              <h4>Objetos (Licencias y Armas)</h4>
+              <div className="admin-input-row">
+                <select value={itemStockId} onChange={(e) => setItemStockId(e.target.value)}>
+                  <option value="">Seleccionar item</option>
+                  {itemsStock.map((it) => (
+                    <option key={`${it.tipo}-${it.id}`} value={it.id}>{it.tipo.toUpperCase()} · {it.nombre} (Stock: {it.stock})</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  value={itemStockDelta}
+                  onChange={(e) => setItemStockDelta(e.target.value)}
+                  placeholder="Delta"
+                />
+                <button
+                  className="admin-btn"
+                  onClick={() => ejecutarAccion("ajustar_stock_item", { item_id: Number(itemStockId), delta: Number(itemStockDelta) })}
+                >
+                  Ajustar Stock
+                </button>
+              </div>
+            </div>
+
+            <button className="admin-btn" onClick={cargarStockMercado}>Recargar stock</button>
           </div>
         </div>
       )}

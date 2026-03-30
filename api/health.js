@@ -2,7 +2,7 @@
 // get /api/health
 // vercel serverless function
 
-import { aplicarHeaders } from "./_lib/seguridad.js";
+import { aplicarHeaders } from "../lib/api/seguridad.js";
 
 export default function handler(req, res) {
   aplicarHeaders(res);

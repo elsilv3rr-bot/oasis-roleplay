@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
-import { crearConexion, cerrarConexion } from "./_lib/database.js";
-import { aplicarHeaders } from "./_lib/seguridad.js";
-import { sanitizar } from "./_lib/validacion.js";
+import { crearConexion, cerrarConexion } from "../lib/api/database.js";
+import { aplicarHeaders } from "../lib/api/seguridad.js";
+import { sanitizar } from "../lib/api/validacion.js";
 
 const COSTO_ENTRADA_CASINO = 45000;
 const COTIZACIONES_CRYPTO = {
@@ -34,6 +34,15 @@ function generarMatricula() {
 
 function numeroAleatorio(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function generarIdMercado() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let id = "";
+  for (let i = 0; i < 8; i += 1) {
+    id += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return id;
 }
 
 async function obtenerPersonaje(connection, discordId, slotNumber, conBloqueo = false) {
@@ -100,6 +109,13 @@ export default async function handler(req, res) {
           "SELECT id_vehiculo AS id, nombre, precio_actual AS precio, stock_global AS stock, imagen_url AS imagen FROM vehiculos_tienda ORDER BY id_vehiculo ASC"
         );
         return res.status(200).json({ ok: true, vehiculos: rows });
+      }
+
+      if (accion === "tienda_items") {
+        const [rows] = await connection.execute(
+          "SELECT id_item AS id, tipo, nombre, precio_actual AS precio, stock_global AS stock, imagen_url AS imagen FROM mercado_items ORDER BY tipo ASC, id_item ASC"
+        );
+        return res.status(200).json({ ok: true, items: rows });
       }
 
       if (accion === "casino_estado") {
@@ -364,6 +380,39 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    if (action === "tienda_sincronizar_items") {
+      const { items } = body;
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: "Items invalidos" });
+      }
+
+      await connection.beginTransaction();
+      for (const item of items) {
+        const id = Number(item.id);
+        const precio = Math.floor(Number(item.precio));
+        const stock = Math.max(0, Math.floor(Number(item.stock)));
+        const nombre = sanitizar(String(item.nombre || "")).trim();
+        const tipo = sanitizar(String(item.tipo || "")).toLowerCase().trim();
+        const imagen = String(item.imagen || "").trim();
+
+        if (!id || !nombre || !precio || !["arma", "documento"].includes(tipo)) continue;
+
+        await connection.execute(
+          `INSERT INTO mercado_items (id_item, tipo, nombre, precio_actual, stock_global, imagen_url)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             tipo = VALUES(tipo),
+             nombre = VALUES(nombre),
+             precio_actual = VALUES(precio_actual),
+             imagen_url = VALUES(imagen_url)`,
+          [id, tipo, nombre, precio, stock, imagen]
+        );
+      }
+
+      await connection.commit();
+      return res.status(200).json({ ok: true });
+    }
+
     if (action === "tienda_comprar_vehiculo") {
       const vehiculoId = Number(body.vehiculoId);
       if (!vehiculoId) {
@@ -406,7 +455,10 @@ export default async function handler(req, res) {
       await connection.execute("UPDATE usuarios SET dinero = dinero - ? WHERE id = ?", [precio, personaje.id]);
       await connection.execute("UPDATE vehiculos_tienda SET stock_global = stock_global - 1 WHERE id_vehiculo = ?", [vehiculoId]);
 
+      const itemUid = generarIdMercado();
+
       const datosExtra = JSON.stringify({
+        itemUid,
         vehiculoId,
         imagen: vehiculo.imagen_url,
         precio,
@@ -424,9 +476,84 @@ export default async function handler(req, res) {
         ok: true,
         vehiculo: {
           id: vehiculoId,
+          itemUid,
           nombre: vehiculo.nombre,
           precio,
           imagen: vehiculo.imagen_url,
+          stock: stock - 1,
+        },
+        dinero: saldo - precio,
+      });
+    }
+
+    if (action === "tienda_comprar_item") {
+      const itemId = Number(body.itemId);
+      if (!itemId) {
+        return res.status(400).json({ error: "itemId requerido" });
+      }
+
+      await connection.beginTransaction();
+
+      const personaje = await obtenerPersonaje(connection, decoded.discordId, slotNumber, true);
+      if (!personaje) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Personaje no encontrado" });
+      }
+
+      const [itemRows] = await connection.execute(
+        "SELECT id_item, tipo, nombre, precio_actual, stock_global, imagen_url FROM mercado_items WHERE id_item = ? LIMIT 1 FOR UPDATE",
+        [itemId]
+      );
+
+      if (itemRows.length === 0) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Item no disponible" });
+      }
+
+      const item = itemRows[0];
+      const precio = Number(item.precio_actual);
+      const stock = Number(item.stock_global);
+      const saldo = Number(personaje.dinero);
+
+      if (stock <= 0) {
+        await connection.rollback();
+        return res.status(400).json({ error: "Sin stock disponible" });
+      }
+
+      if (saldo < precio) {
+        await connection.rollback();
+        return res.status(400).json({ error: "Saldo insuficiente" });
+      }
+
+      await connection.execute("UPDATE usuarios SET dinero = dinero - ? WHERE id = ?", [precio, personaje.id]);
+      await connection.execute("UPDATE mercado_items SET stock_global = stock_global - 1 WHERE id_item = ?", [itemId]);
+
+      const itemUid = generarIdMercado();
+      const tipoInventario = item.tipo === "documento" ? "documento" : "arma";
+      const datosExtra = JSON.stringify({
+        itemUid,
+        itemId,
+        tipo: item.tipo,
+        imagen: item.imagen_url,
+        precio,
+      });
+
+      await connection.execute(
+        "INSERT INTO inventario (discord_id, slot_number, nombre_item, tipo, datos_extra) VALUES (?, ?, ?, ?, ?)",
+        [personaje.discord_id, personaje.slot_number, item.nombre, tipoInventario, datosExtra]
+      );
+
+      await connection.commit();
+
+      return res.status(200).json({
+        ok: true,
+        item: {
+          id: itemId,
+          itemUid,
+          nombre: item.nombre,
+          tipo: item.tipo,
+          precio,
+          imagen: item.imagen_url,
           stock: stock - 1,
         },
         dinero: saldo - precio,
