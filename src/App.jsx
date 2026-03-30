@@ -1594,25 +1594,20 @@ const comprarItem = async () => {
       {/* SIDEBAR (derecha) */}
       <aside className="sidebar">
         <div className="sidebar-header">
-          <div className="sidebar-title sidebar-title-logo">
-            <span className="sidebar-o-wrap">
-              O
-              <img
-                className="sidebar-logo sidebar-logo-inline"
-                src="/logo/logo.png"
-                alt="Logo"
-                onError={(e) => {
-                  if (!e.currentTarget.dataset.fallback) {
-                    e.currentTarget.dataset.fallback = "1";
-                    e.currentTarget.src = "/logo.png";
-                    return;
-                  }
-                  e.currentTarget.style.display = "none";
-                }}
-              />
-            </span>
-            <span>asis RolePlay</span>
-          </div>
+          <img
+            className="sidebar-logo"
+            src="/logo/logo.png"
+            alt="Logo"
+            onError={(e) => {
+              if (!e.currentTarget.dataset.fallback) {
+                e.currentTarget.dataset.fallback = "1";
+                e.currentTarget.src = "/logo.png";
+                return;
+              }
+              e.currentTarget.style.display = "none";
+            }}
+          />
+          <div className="sidebar-title">Oasis RolePlay</div>
         </div>
 
         <div className="sidebar-divider" />
