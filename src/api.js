@@ -356,13 +356,13 @@ async function registrarVehiculoDB(nombreVehiculo, slotNumber = 1) {
   const token = getToken();
   if (!token) throw new Error("Sesion expirada");
 
-  const res = await fetch(`${API_URL}/vehiculos`, {
+  const res = await fetch(`${API_URL}/banco`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ nombre_vehiculo: nombreVehiculo, slotNumber }),
+    body: JSON.stringify({ action: "registrar_vehiculo", nombre_vehiculo: nombreVehiculo, slotNumber }),
   });
 
   const data = await res.json().catch(() => ({}));
@@ -377,7 +377,7 @@ async function obtenerMultasDB(slotNumber = 1) {
   const token = getToken();
   if (!token) return { multas: [], cargos: [] };
 
-  const res = await fetch(`${API_URL}/multas?slotNumber=${slotNumber}`, {
+  const res = await fetch(`${API_URL}/banco?accion=multas&slotNumber=${slotNumber}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -391,13 +391,13 @@ async function pagarMultaDB(multaId, slotNumber = 1) {
   const token = getToken();
   if (!token) throw new Error("Sesion expirada");
 
-  const res = await fetch(`${API_URL}/multas?slotNumber=${slotNumber}`, {
+  const res = await fetch(`${API_URL}/banco`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ accion: "pagar_multa", multa_id: multaId, slotNumber }),
+    body: JSON.stringify({ action: "pagar_multa", multa_id: multaId, slotNumber }),
   });
 
   const data = await res.json().catch(() => ({}));
@@ -410,13 +410,13 @@ async function pagarTodasMultasDB(slotNumber = 1) {
   const token = getToken();
   if (!token) throw new Error("Sesion expirada");
 
-  const res = await fetch(`${API_URL}/multas?slotNumber=${slotNumber}`, {
+  const res = await fetch(`${API_URL}/banco`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ accion: "pagar_todas", slotNumber }),
+    body: JSON.stringify({ action: "pagar_todas", slotNumber }),
   });
 
   const data = await res.json().catch(() => ({}));
@@ -428,7 +428,7 @@ async function obtenerCatalogoVehiculos() {
   const token = getToken();
   if (!token) return { vehiculos: [] };
 
-  const res = await fetch(`${API_URL}/tienda`, {
+  const res = await fetch(`${API_URL}/banco?accion=tienda_catalogo`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -441,13 +441,13 @@ async function sincronizarCatalogoVehiculos(vehiculos) {
   const token = getToken();
   if (!token) throw new Error("Sesion expirada");
 
-  const res = await fetch(`${API_URL}/tienda`, {
+  const res = await fetch(`${API_URL}/banco`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ accion: "sincronizar_catalogo", vehiculos }),
+    body: JSON.stringify({ action: "tienda_sincronizar_catalogo", vehiculos }),
   });
 
   const data = await res.json().catch(() => ({}));
@@ -459,13 +459,13 @@ async function comprarVehiculoTienda(vehiculoId, slotNumber = 1) {
   const token = getToken();
   if (!token) throw new Error("Sesion expirada");
 
-  const res = await fetch(`${API_URL}/tienda`, {
+  const res = await fetch(`${API_URL}/banco`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ accion: "comprar_vehiculo", vehiculoId, slotNumber }),
+    body: JSON.stringify({ action: "tienda_comprar_vehiculo", vehiculoId, slotNumber }),
   });
 
   const data = await res.json().catch(() => ({}));
@@ -477,7 +477,7 @@ async function obtenerEstadoCasino(slotNumber = 1) {
   const token = getToken();
   if (!token) return null;
 
-  const res = await fetch(`${API_URL}/casino?slotNumber=${slotNumber}`, {
+  const res = await fetch(`${API_URL}/banco?accion=casino_estado&slotNumber=${slotNumber}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -490,13 +490,13 @@ async function comprarEntradaCasino(slotNumber = 1) {
   const token = getToken();
   if (!token) throw new Error("Sesion expirada");
 
-  const res = await fetch(`${API_URL}/casino`, {
+  const res = await fetch(`${API_URL}/banco`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ accion: "comprar_entrada", slotNumber }),
+    body: JSON.stringify({ action: "casino_comprar_entrada", slotNumber }),
   });
 
   const data = await res.json().catch(() => ({}));
@@ -508,13 +508,13 @@ async function jugarCasino(accion, apuesta, extra = {}, slotNumber = 1) {
   const token = getToken();
   if (!token) throw new Error("Sesion expirada");
 
-  const res = await fetch(`${API_URL}/casino`, {
+  const res = await fetch(`${API_URL}/banco`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ accion, apuesta, slotNumber, ...extra }),
+    body: JSON.stringify({ action: accion, apuesta, slotNumber, ...extra }),
   });
 
   const data = await res.json().catch(() => ({}));
@@ -526,7 +526,7 @@ async function obtenerEstadoCrypto(slotNumber = 1) {
   const token = getToken();
   if (!token) return null;
 
-  const res = await fetch(`${API_URL}/crypto?slotNumber=${slotNumber}`, {
+  const res = await fetch(`${API_URL}/banco?accion=crypto_estado&slotNumber=${slotNumber}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -539,13 +539,18 @@ async function operarCrypto(accion, moneda, cantidad, slotNumber = 1) {
   const token = getToken();
   if (!token) throw new Error("Sesion expirada");
 
-  const res = await fetch(`${API_URL}/crypto`, {
+  const res = await fetch(`${API_URL}/banco`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ accion, moneda, cantidad, slotNumber }),
+    body: JSON.stringify({
+      action: accion === "comprar" ? "crypto_comprar" : "crypto_vender",
+      moneda,
+      cantidad,
+      slotNumber,
+    }),
   });
 
   const data = await res.json().catch(() => ({}));
