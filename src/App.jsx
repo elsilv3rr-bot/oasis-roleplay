@@ -2547,7 +2547,7 @@ const comprarItem = async () => {
               {active === "misiones" && <Misiones />}
 
               {/* ================= FACCIONES ================= */}
-              {active === "facciones" && <Facciones />}
+              {active === "facciones" && <Facciones slotNumber={datos.slotNumber || 1} esAdmin={esAdminUsuario} />}
 
               {/* ================= LEADERBOARD ================= */}
               {active === "leaderboard" && <Leaderboard />}
@@ -3075,6 +3075,7 @@ function AdminPanel({ discordId }) {
   const [profesiones, setProfesiones] = React.useState([]);
   const [admins, setAdmins] = React.useState([]);
   const [niveles, setNiveles] = React.useState([]);
+  const [faccionesAdmin, setFaccionesAdmin] = React.useState([]);
   const [logs, setLogs] = React.useState([]);
   const [perfiles, setPerfiles] = React.useState([]);
   const [vehiculosStock, setVehiculosStock] = React.useState([]);
@@ -3092,6 +3093,8 @@ function AdminPanel({ discordId }) {
   const [slotDesbloquear, setSlotDesbloquear] = React.useState("2");
   const [rolAsignar, setRolAsignar] = React.useState("");
   const [placaAsignar, setPlacaAsignar] = React.useState("");
+  const [faccionAsignar, setFaccionAsignar] = React.useState("");
+  const [rangoFaccionAsignar, setRangoFaccionAsignar] = React.useState("recluta");
   const [vipAsignar, setVipAsignar] = React.useState("");
   const [nuevoAdminId, setNuevoAdminId] = React.useState("");
   const [tipoItemAdmin, setTipoItemAdmin] = React.useState("vehiculo");
@@ -3137,6 +3140,13 @@ function AdminPanel({ discordId }) {
     } catch {}
   };
 
+  const cargarFaccionesAdmin = async () => {
+    try {
+      const data = await obtenerDatosAdmin("facciones");
+      setFaccionesAdmin(Array.isArray(data?.facciones) ? data.facciones : []);
+    } catch {}
+  };
+
   const cargarLogs = async () => {
     try {
       const data = await obtenerDatosAdmin("logs");
@@ -3169,6 +3179,7 @@ function AdminPanel({ discordId }) {
     cargarProfesiones();
     cargarAdmins();
     cargarNiveles();
+    cargarFaccionesAdmin();
     cargarLogs();
     cargarStockMercado();
   }, []);
@@ -3304,7 +3315,34 @@ function AdminPanel({ discordId }) {
               <div className="admin-input-row">
                 <input placeholder="N° de placa" value={placaAsignar} onChange={e => setPlacaAsignar(e.target.value)} />
                 <button className="admin-btn" onClick={() => { ejecutarAccionUsuario("asignar_placa", { placa: placaAsignar }); setPlacaAsignar(""); }}>Asignar Placa</button>
+                <button className="admin-btn-danger" onClick={() => { ejecutarAccionUsuario("quitar_placa"); }}>Quitar Placa</button>
               </div>
+            </div>
+
+            <div className="admin-accion-grupo">
+              <h4>Facciones (aprobar ingreso por examen)</h4>
+              <div className="admin-input-row">
+                <select value={faccionAsignar} onChange={e => setFaccionAsignar(e.target.value)}>
+                  <option value="">Seleccionar faccion</option>
+                  {faccionesAdmin.map(f => <option key={f.id} value={f.id}>{f.nombre} (ID {f.id})</option>)}
+                </select>
+                <select value={rangoFaccionAsignar} onChange={e => setRangoFaccionAsignar(e.target.value)}>
+                  <option value="recluta">Recluta</option>
+                  <option value="miembro">Miembro</option>
+                  <option value="oficial">Oficial</option>
+                  <option value="lider">Lider</option>
+                </select>
+                <button className="admin-btn" onClick={() => {
+                  ejecutarAccionUsuario("agregar_miembro_faccion", {
+                    faccion_id: Number(faccionAsignar),
+                    rango: rangoFaccionAsignar,
+                  });
+                }}>Agregar a Faccion</button>
+                <button className="admin-btn-danger" onClick={() => {
+                  ejecutarAccionUsuario("quitar_miembro_faccion");
+                }}>Quitar de Faccion</button>
+              </div>
+              <div className="admin-accion-ayuda">Usa stateID + faccion para aprobar ingresos luego del examen.</div>
             </div>
 
             <div className="admin-accion-grupo">

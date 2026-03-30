@@ -158,6 +158,13 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, vehiculos, items });
       }
 
+      if (accion === "facciones") {
+        const [rows] = await connection.execute(
+          "SELECT id, nombre, color, max_miembros, activa FROM facciones WHERE activa = 1 ORDER BY nombre ASC"
+        );
+        return res.status(200).json({ ok: true, facciones: rows });
+      }
+
       if (accion === "profesiones") {
         const [rows] = await connection.execute("SELECT * FROM profesiones ORDER BY nombre ASC");
         return res.status(200).json({ ok: true, profesiones: rows });
@@ -407,6 +414,138 @@ export default async function handler(req, res) {
       if (result.affectedRows === 0) return res.status(404).json({ error: "Personaje no encontrado" });
 
       await registrarLogAdmin(connection, decoded.discordId, `Asigno placa "${placa}" a ${stateid}`);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (accion === "quitar_placa") {
+      const { stateid } = body;
+      if (!stateid) return res.status(400).json({ error: "stateid requerido" });
+
+      const [result] = await connection.execute(
+        "UPDATE usuarios SET placa_policial = NULL WHERE stateid = ?",
+        [sanitizar(stateid)]
+      );
+
+      if (result.affectedRows === 0) return res.status(404).json({ error: "Personaje no encontrado" });
+
+      await registrarLogAdmin(connection, decoded.discordId, `Quito placa policial de ${stateid}`);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (accion === "agregar_miembro_faccion") {
+      const stateid = sanitizar(String(body.stateid || "")).trim();
+      const faccionId = Number(body.faccion_id);
+      const rango = sanitizar(String(body.rango || "recluta")).toLowerCase();
+      const rangosValidos = ["lider", "oficial", "miembro", "recluta"];
+
+      if (!stateid || !faccionId) {
+        return res.status(400).json({ error: "stateid y faccion_id requeridos" });
+      }
+      if (!rangosValidos.includes(rango)) {
+        return res.status(400).json({ error: "Rango invalido" });
+      }
+
+      await connection.beginTransaction();
+      try {
+        const [userRows] = await connection.execute(
+          "SELECT discord_id, slot_number FROM usuarios WHERE stateid = ? LIMIT 1 FOR UPDATE",
+          [stateid]
+        );
+        if (userRows.length === 0) {
+          await connection.rollback();
+          return res.status(404).json({ error: "Personaje no encontrado" });
+        }
+
+        const [faccionRows] = await connection.execute(
+          "SELECT id, nombre, max_miembros FROM facciones WHERE id = ? AND activa = 1 LIMIT 1",
+          [faccionId]
+        );
+        if (faccionRows.length === 0) {
+          await connection.rollback();
+          return res.status(404).json({ error: "Faccion no encontrada" });
+        }
+
+        const objetivoDiscordId = String(userRows[0].discord_id || "");
+        const objetivoSlot = Number(userRows[0].slot_number || 1);
+
+        const [membresiaRows] = await connection.execute(
+          "SELECT id, faccion_id FROM faccion_miembros WHERE discord_id = ? AND slot_number = ? LIMIT 1 FOR UPDATE",
+          [objetivoDiscordId, objetivoSlot]
+        );
+
+        if (membresiaRows.length === 0 || Number(membresiaRows[0].faccion_id) !== faccionId) {
+          const [countRows] = await connection.execute(
+            "SELECT COUNT(*) AS total FROM faccion_miembros WHERE faccion_id = ?",
+            [faccionId]
+          );
+          if (Number(countRows[0].total || 0) >= Number(faccionRows[0].max_miembros || 0)) {
+            await connection.rollback();
+            return res.status(400).json({ error: "La faccion esta llena" });
+          }
+        }
+
+        if (membresiaRows.length > 0) {
+          await connection.execute(
+            "UPDATE faccion_miembros SET faccion_id = ?, rango = ? WHERE id = ?",
+            [faccionId, rango, Number(membresiaRows[0].id)]
+          );
+        } else {
+          await connection.execute(
+            "INSERT INTO faccion_miembros (faccion_id, discord_id, slot_number, rango) VALUES (?, ?, ?, ?)",
+            [faccionId, objetivoDiscordId, objetivoSlot, rango]
+          );
+        }
+
+        await connection.commit();
+
+        await registrarLogAdmin(
+          connection,
+          decoded.discordId,
+          `Agrego miembro ${stateid} a faccion ${faccionRows[0].nombre}`,
+          objetivoDiscordId,
+          `Faccion ID: ${faccionId} · Rango: ${rango}`
+        );
+
+        return res.status(200).json({ ok: true, faccion: faccionRows[0].nombre, rango });
+      } catch (err) {
+        await connection.rollback();
+        throw err;
+      }
+    }
+
+    if (accion === "quitar_miembro_faccion") {
+      const stateid = sanitizar(String(body.stateid || "")).trim();
+      if (!stateid) return res.status(400).json({ error: "stateid requerido" });
+
+      const [userRows] = await connection.execute(
+        "SELECT discord_id, slot_number FROM usuarios WHERE stateid = ? LIMIT 1",
+        [stateid]
+      );
+
+      if (userRows.length === 0) {
+        return res.status(404).json({ error: "Personaje no encontrado" });
+      }
+
+      const objetivoDiscordId = String(userRows[0].discord_id || "");
+      const objetivoSlot = Number(userRows[0].slot_number || 1);
+
+      const [result] = await connection.execute(
+        "DELETE FROM faccion_miembros WHERE discord_id = ? AND slot_number = ?",
+        [objetivoDiscordId, objetivoSlot]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "El usuario no pertenece a ninguna faccion" });
+      }
+
+      await registrarLogAdmin(
+        connection,
+        decoded.discordId,
+        `Quito miembro ${stateid} de faccion`,
+        objetivoDiscordId,
+        "Expulsion manual desde panel admin"
+      );
+
       return res.status(200).json({ ok: true });
     }
 

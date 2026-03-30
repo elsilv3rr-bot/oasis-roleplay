@@ -499,9 +499,26 @@ async function handleFacciones(req, res, connection, auth, action, body) {
     const discordId = sanitizar(body.discordId || "");
     const slot = parseInt(body.slot || "1", 10);
     const faccionId = parseInt(body.faccionId, 10);
+    const aprobacionExamen = body.aprobacionExamen === true;
 
     if (!discordId || isNaN(faccionId)) {
       return res.status(400).json({ error: "discordId y faccionId requeridos" });
+    }
+
+    if (!aprobacionExamen) {
+      return res.status(403).json({ error: "No puedes unirte directamente. Debes aprobar el examen y ser agregado por un administrador." });
+    }
+
+    if (auth.origen !== "web" || !auth?.usuario?.discordId) {
+      return res.status(403).json({ error: "Solo un administrador puede aprobar ingresos a facciones." });
+    }
+
+    const [adminRows] = await connection.execute(
+      "SELECT id FROM admins WHERE discord_id = ? LIMIT 1",
+      [String(auth.usuario.discordId)]
+    );
+    if (adminRows.length === 0) {
+      return res.status(403).json({ error: "No tienes permisos para aprobar examenes de faccion." });
     }
 
     const [ya] = await connection.execute(

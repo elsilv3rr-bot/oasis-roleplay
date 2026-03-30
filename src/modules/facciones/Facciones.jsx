@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { listarFacciones, detalleFaccion, miFaccion, unirseFaccion, depositarFaccion } from "../../api";
 
-function Facciones({ slotNumber = 1 }) {
+function Facciones({ slotNumber = 1, esAdmin = false }) {
   const [vista, setVista] = useState("mi_faccion");
   const [miFaccionData, setMiFaccion] = useState(null);
   const [faccionesLista, setFaccionesLista] = useState([]);
@@ -32,7 +32,7 @@ function Facciones({ slotNumber = 1 }) {
 
   async function handleUnirse(faccionId) {
     try {
-      const data = await unirseFaccion(faccionId, slotNumber);
+      const data = await unirseFaccion(faccionId, slotNumber, esAdmin);
       setMensaje(`✅ Te uniste a ${data.faccion} como ${data.rango}`);
       setVista("mi_faccion");
     } catch (err) {
@@ -146,10 +146,16 @@ function Facciones({ slotNumber = 1 }) {
                   style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #2d2640", background: "transparent", color: "#7c3aed", cursor: "pointer", fontSize: 12 }}>
                   Ver detalle
                 </button>
-                <button onClick={() => handleUnirse(f.id)}
-                  style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#7c3aed", color: "#fff", cursor: "pointer", fontSize: 12 }}>
-                  Unirme
-                </button>
+                {esAdmin ? (
+                  <button onClick={() => handleUnirse(f.id)}
+                    style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#7c3aed", color: "#fff", cursor: "pointer", fontSize: 12 }}>
+                    Unirme
+                  </button>
+                ) : (
+                  <span style={{ fontSize: 12, color: "#a0a0a0", alignSelf: "center" }}>
+                    Requiere examen y aprobacion administrativa
+                  </span>
+                )}
               </div>
             </div>
           ))}

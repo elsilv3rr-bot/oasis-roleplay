@@ -673,12 +673,12 @@ async function miFaccion(slotNumber = 1) {
   return data;
 }
 
-async function unirseFaccion(faccionId, slotNumber = 1) {
+async function unirseFaccion(faccionId, slotNumber = 1, aprobacionExamen = false) {
   const token = getToken();
   const res = await fetch(`${API_URL}/internal`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ domain: "facciones", action: "unirse", discordId: "me", slot: slotNumber, faccionId }),
+    body: JSON.stringify({ domain: "facciones", action: "unirse", discordId: "me", slot: slotNumber, faccionId, aprobacionExamen }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Error uniendose");
