@@ -29,6 +29,8 @@ export default async function handler(req, res) {
     connection = await crearConexion();
     const slotNumber = parseInt(req.query.slotNumber || req.body?.slotNumber || "1", 10);
 
+    const ventana24hMs = 24 * 60 * 60 * 1000;
+
     // GET: estado de recompensa diaria //
     if (req.method === "GET") {
       const [personaje] = await connection.execute(
@@ -41,13 +43,21 @@ export default async function handler(req, res) {
       }
 
       const p = personaje[0];
-      const hoy = new Date().toISOString().split("T")[0];
-
-      // Verificar si ya cobro hoy //
-      const [cobrado] = await connection.execute(
-        "SELECT id FROM recompensas_diarias WHERE discord_id = ? AND slot_number = ? AND fecha_cobro = ? LIMIT 1",
-        [decoded.discordId, slotNumber, hoy]
+      const [ultimoCobroRows] = await connection.execute(
+        `SELECT created_at
+         FROM recompensas_diarias
+         WHERE discord_id = ? AND slot_number = ?
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [decoded.discordId, slotNumber]
       );
+
+      const ultimoCobro = ultimoCobroRows.length > 0 ? new Date(ultimoCobroRows[0].created_at) : null;
+      const ahoraMs = Date.now();
+      const ultimoCobroMs = ultimoCobro ? ultimoCobro.getTime() : 0;
+      const yaCobrado = ultimoCobro ? (ahoraMs - ultimoCobroMs) < ventana24hMs : false;
+      const restanteMs = yaCobrado ? (ventana24hMs - (ahoraMs - ultimoCobroMs)) : 0;
+      const proximoCobroEnSegundos = Math.max(0, Math.ceil(restanteMs / 1000));
 
       // Obtener recompensa VIP //
       const [vipRows] = await connection.execute(
@@ -67,7 +77,9 @@ export default async function handler(req, res) {
 
       return res.status(200).json({
         ok: true,
-        yaCobrado: cobrado.length > 0,
+        yaCobrado,
+        proximoCobroEnSegundos,
+        ultimoCobro: ultimoCobro ? ultimoCobro.toISOString() : null,
         monto: montoTotal,
         desglose: {
           vip: { nivel: p.nivel_vip || "ninguno", monto: recompensaVip },
@@ -96,17 +108,26 @@ export default async function handler(req, res) {
     }
 
     const p = personaje[0];
-    const hoy = new Date().toISOString().split("T")[0];
-
-    // Verificar si ya cobro hoy //
-    const [cobrado] = await connection.execute(
-      "SELECT id FROM recompensas_diarias WHERE discord_id = ? AND slot_number = ? AND fecha_cobro = ? LIMIT 1",
-      [decoded.discordId, slotNumber, hoy]
+    const [ultimoCobroRows] = await connection.execute(
+      `SELECT created_at
+       FROM recompensas_diarias
+       WHERE discord_id = ? AND slot_number = ?
+       ORDER BY created_at DESC
+       LIMIT 1 FOR UPDATE`,
+      [decoded.discordId, slotNumber]
     );
 
-    if (cobrado.length > 0) {
+    const ultimoCobro = ultimoCobroRows.length > 0 ? new Date(ultimoCobroRows[0].created_at) : null;
+    const ahoraMs = Date.now();
+    const ultimoCobroMs = ultimoCobro ? ultimoCobro.getTime() : 0;
+
+    if (ultimoCobro && (ahoraMs - ultimoCobroMs) < ventana24hMs) {
+      const restanteSegundos = Math.ceil((ventana24hMs - (ahoraMs - ultimoCobroMs)) / 1000);
       await connection.rollback();
-      return res.status(400).json({ error: "Ya cobraste tu recompensa hoy" });
+      return res.status(400).json({
+        error: "Aun no puedes cobrar. Deben pasar 24 horas.",
+        proximoCobroEnSegundos: Math.max(0, restanteSegundos),
+      });
     }
 
     // Calcular monto //
@@ -133,7 +154,7 @@ export default async function handler(req, res) {
     // Registrar cobro //
     await connection.execute(
       "INSERT INTO recompensas_diarias (discord_id, slot_number, monto, fecha_cobro) VALUES (?, ?, ?, ?)",
-      [decoded.discordId, slotNumber, montoTotal, hoy]
+      [decoded.discordId, slotNumber, montoTotal, new Date().toISOString().split("T")[0]]
     );
 
     await connection.commit();

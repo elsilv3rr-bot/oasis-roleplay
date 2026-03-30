@@ -339,7 +339,13 @@ async function cobrarRecompensaDiaria(slotNumber = 1) {
   });
 
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Error al cobrar recompensa");
+  if (!res.ok) {
+    const err = new Error(data.error || "Error al cobrar recompensa");
+    if (typeof data.proximoCobroEnSegundos === "number") {
+      err.proximoCobroEnSegundos = data.proximoCobroEnSegundos;
+    }
+    throw err;
+  }
   return data;
 }
 
@@ -418,6 +424,135 @@ async function pagarTodasMultasDB(slotNumber = 1) {
   return data;
 }
 
+async function obtenerCatalogoVehiculos() {
+  const token = getToken();
+  if (!token) return { vehiculos: [] };
+
+  const res = await fetch(`${API_URL}/tienda`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al obtener catalogo");
+  return data;
+}
+
+async function sincronizarCatalogoVehiculos(vehiculos) {
+  const token = getToken();
+  if (!token) throw new Error("Sesion expirada");
+
+  const res = await fetch(`${API_URL}/tienda`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ accion: "sincronizar_catalogo", vehiculos }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al sincronizar catalogo");
+  return data;
+}
+
+async function comprarVehiculoTienda(vehiculoId, slotNumber = 1) {
+  const token = getToken();
+  if (!token) throw new Error("Sesion expirada");
+
+  const res = await fetch(`${API_URL}/tienda`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ accion: "comprar_vehiculo", vehiculoId, slotNumber }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al comprar vehiculo");
+  return data;
+}
+
+async function obtenerEstadoCasino(slotNumber = 1) {
+  const token = getToken();
+  if (!token) return null;
+
+  const res = await fetch(`${API_URL}/casino?slotNumber=${slotNumber}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al consultar casino");
+  return data;
+}
+
+async function comprarEntradaCasino(slotNumber = 1) {
+  const token = getToken();
+  if (!token) throw new Error("Sesion expirada");
+
+  const res = await fetch(`${API_URL}/casino`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ accion: "comprar_entrada", slotNumber }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al comprar entrada");
+  return data;
+}
+
+async function jugarCasino(accion, apuesta, extra = {}, slotNumber = 1) {
+  const token = getToken();
+  if (!token) throw new Error("Sesion expirada");
+
+  const res = await fetch(`${API_URL}/casino`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ accion, apuesta, slotNumber, ...extra }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al jugar");
+  return data;
+}
+
+async function obtenerEstadoCrypto(slotNumber = 1) {
+  const token = getToken();
+  if (!token) return null;
+
+  const res = await fetch(`${API_URL}/crypto?slotNumber=${slotNumber}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error al consultar crypto");
+  return data;
+}
+
+async function operarCrypto(accion, moneda, cantidad, slotNumber = 1) {
+  const token = getToken();
+  if (!token) throw new Error("Sesion expirada");
+
+  const res = await fetch(`${API_URL}/crypto`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ accion, moneda, cantidad, slotNumber }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error en operacion crypto");
+  return data;
+}
+
 export {
   getToken,
   setToken,
@@ -443,5 +578,13 @@ export {
   obtenerMultasDB,
   pagarMultaDB,
   pagarTodasMultasDB,
+  obtenerCatalogoVehiculos,
+  sincronizarCatalogoVehiculos,
+  comprarVehiculoTienda,
+  obtenerEstadoCasino,
+  comprarEntradaCasino,
+  jugarCasino,
+  obtenerEstadoCrypto,
+  operarCrypto,
 };
 

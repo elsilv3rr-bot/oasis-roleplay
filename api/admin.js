@@ -116,7 +116,15 @@ export default async function handler(req, res) {
 
       if (accion === "logs") {
         const [rows] = await connection.execute(
-          "SELECT * FROM admin_logs ORDER BY created_at DESC LIMIT 100"
+          `SELECT l.id, l.accion, l.detalles, l.created_at,
+                  l.admin_discord_id, l.objetivo_discord_id,
+                  u.username AS admin_username,
+                  ou.username AS objetivo_username
+           FROM admin_logs l
+           LEFT JOIN users u ON u.discord_id = l.admin_discord_id
+           LEFT JOIN users ou ON ou.discord_id = l.objetivo_discord_id
+           ORDER BY l.created_at DESC
+           LIMIT 150`
         );
         return res.status(200).json({ ok: true, logs: rows });
       }
@@ -428,6 +436,195 @@ export default async function handler(req, res) {
       }
 
       await registrarLogAdmin(connection, decoded.discordId, `Modifico VIP "${nombre}"`);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (accion === "eliminar_vip") {
+      const { id, nombre } = body;
+
+      let vipNombre = sanitizar(String(nombre || "")).trim();
+
+      if (!vipNombre && id) {
+        const [vipRows] = await connection.execute(
+          "SELECT nombre FROM niveles_vip WHERE id = ? LIMIT 1",
+          [Number(id)]
+        );
+        if (vipRows.length > 0) {
+          vipNombre = String(vipRows[0].nombre || "").trim();
+        }
+      }
+
+      if (!vipNombre) {
+        return res.status(400).json({ error: "Nivel VIP invalido" });
+      }
+
+      if (vipNombre.toLowerCase() === "ninguno") {
+        return res.status(400).json({ error: "No puedes eliminar el nivel base 'ninguno'" });
+      }
+
+      await connection.beginTransaction();
+
+      await connection.execute(
+        "UPDATE usuarios SET nivel_vip = 'ninguno' WHERE nivel_vip = ?",
+        [vipNombre]
+      );
+
+      const [result] = await connection.execute(
+        "DELETE FROM niveles_vip WHERE nombre = ?",
+        [vipNombre]
+      );
+
+      await connection.commit();
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Nivel VIP no encontrado" });
+      }
+
+      await registrarLogAdmin(connection, decoded.discordId, `Elimino VIP \"${vipNombre}\"`, null, "Los usuarios afectados pasaron a nivel ninguno");
+      return res.status(200).json({ ok: true });
+    }
+
+    if (accion === "agregar_item_usuario") {
+      const { stateid, tipo, nombre } = body;
+      const tipoItem = sanitizar(String(tipo || "")).toLowerCase();
+      const nombreItem = sanitizar(String(nombre || "")).trim();
+
+      if (!stateid || !nombreItem) {
+        return res.status(400).json({ error: "stateid y nombre requeridos" });
+      }
+
+      if (!["vehiculo", "arma"].includes(tipoItem)) {
+        return res.status(400).json({ error: "tipo invalido. Usa vehiculo o arma" });
+      }
+
+      const [userRows] = await connection.execute(
+        "SELECT discord_id, slot_number FROM usuarios WHERE stateid = ? LIMIT 1",
+        [sanitizar(stateid)]
+      );
+
+      if (userRows.length === 0) {
+        return res.status(404).json({ error: "Personaje no encontrado" });
+      }
+
+      await connection.execute(
+        "INSERT INTO inventario (discord_id, slot_number, nombre_item, tipo, datos_extra) VALUES (?, ?, ?, ?, ?)",
+        [
+          userRows[0].discord_id,
+          Number(userRows[0].slot_number),
+          nombreItem,
+          tipoItem,
+          JSON.stringify({ origen: "panel_admin" }),
+        ]
+      );
+
+      await registrarLogAdmin(connection, decoded.discordId, `Agrego ${tipoItem} a ${stateid}`, userRows[0].discord_id, `Item: ${nombreItem}`);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (accion === "quitar_item_usuario") {
+      const { stateid, tipo, nombre, item_id } = body;
+      const tipoItem = sanitizar(String(tipo || "")).toLowerCase();
+      const nombreItem = sanitizar(String(nombre || "")).trim();
+
+      if (!stateid) {
+        return res.status(400).json({ error: "stateid requerido" });
+      }
+
+      const [userRows] = await connection.execute(
+        "SELECT discord_id, slot_number FROM usuarios WHERE stateid = ? LIMIT 1",
+        [sanitizar(stateid)]
+      );
+
+      if (userRows.length === 0) {
+        return res.status(404).json({ error: "Personaje no encontrado" });
+      }
+
+      let result;
+      if (item_id) {
+        [result] = await connection.execute(
+          "DELETE FROM inventario WHERE id = ? AND discord_id = ? AND slot_number = ? LIMIT 1",
+          [Number(item_id), userRows[0].discord_id, Number(userRows[0].slot_number)]
+        );
+      } else {
+        if (!["vehiculo", "arma"].includes(tipoItem) || !nombreItem) {
+          return res.status(400).json({ error: "Debes enviar item_id o tipo + nombre" });
+        }
+
+        [result] = await connection.execute(
+          `DELETE FROM inventario
+           WHERE discord_id = ? AND slot_number = ? AND tipo = ? AND nombre_item = ?
+           ORDER BY id DESC
+           LIMIT 1`,
+          [userRows[0].discord_id, Number(userRows[0].slot_number), tipoItem, nombreItem]
+        );
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Item no encontrado" });
+      }
+
+      await registrarLogAdmin(connection, decoded.discordId, `Quito item de ${stateid}`, userRows[0].discord_id, `Tipo: ${tipoItem || "por_id"} · Nombre: ${nombreItem || "-"} · ItemID: ${item_id || "-"}`);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (accion === "agregar_multa_admin") {
+      const { stateid, motivo, monto } = body;
+      const montoNum = Math.floor(Number(monto));
+      const motivoTexto = sanitizar(String(motivo || "")).trim();
+
+      if (!stateid || !motivoTexto || !montoNum || montoNum <= 0) {
+        return res.status(400).json({ error: "stateid, motivo y monto validos son requeridos" });
+      }
+
+      const [targetRows] = await connection.execute(
+        "SELECT discord_id, stateid FROM usuarios WHERE stateid = ? LIMIT 1",
+        [sanitizar(stateid)]
+      );
+
+      if (targetRows.length === 0) {
+        return res.status(404).json({ error: "Personaje no encontrado" });
+      }
+
+      await connection.execute(
+        "INSERT INTO multas (stateid_infractor, stateid_oficial, motivo, monto) VALUES (?, NULL, ?, ?)",
+        [sanitizar(stateid), motivoTexto, montoNum]
+      );
+
+      await registrarLogAdmin(connection, decoded.discordId, `Agrego multa a ${stateid}`, targetRows[0].discord_id, `${motivoTexto} - $${montoNum}`);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (accion === "quitar_multa_admin") {
+      const { multa_id } = body;
+      const multaIdNum = Number(multa_id);
+      if (!multaIdNum) {
+        return res.status(400).json({ error: "multa_id requerido" });
+      }
+
+      const [multaRows] = await connection.execute(
+        "SELECT stateid_infractor FROM multas WHERE id = ? LIMIT 1",
+        [multaIdNum]
+      );
+
+      if (multaRows.length === 0) {
+        return res.status(404).json({ error: "Multa no encontrada" });
+      }
+
+      const [userRows] = await connection.execute(
+        "SELECT discord_id FROM usuarios WHERE stateid = ? LIMIT 1",
+        [String(multaRows[0].stateid_infractor || "")]
+      );
+
+      await connection.execute("DELETE FROM multas WHERE id = ?", [multaIdNum]);
+
+      await registrarLogAdmin(
+        connection,
+        decoded.discordId,
+        `Elimino multa ID ${multaIdNum}`,
+        userRows.length > 0 ? userRows[0].discord_id : null,
+        `Infractor StateID: ${multaRows[0].stateid_infractor}`
+      );
+
       return res.status(200).json({ ok: true });
     }
 

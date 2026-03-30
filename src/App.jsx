@@ -1,7 +1,7 @@
 import React from "react"
 import { useState, useEffect } from "react"
 import { Routes, Route, useNavigate, useSearchParams } from "react-router-dom"
-import { iniciarLoginDiscord, obtenerSlotsPersonajes, desbloquearSlotPersonaje, obtenerUsuario, registrarPersonaje, setToken, cerrarSesion, obtenerSaldoDB, transferirDineroDB, debitarDineroDB, verificarAdmin, obtenerDatosAdmin, accionAdmin, consultaPolicial, accionPolicial, obtenerRecompensaDiaria, cobrarRecompensaDiaria, registrarVehiculoDB, obtenerMultasDB, pagarMultaDB, pagarTodasMultasDB } from "./api"
+import { iniciarLoginDiscord, obtenerSlotsPersonajes, desbloquearSlotPersonaje, obtenerUsuario, registrarPersonaje, setToken, cerrarSesion, obtenerSaldoDB, transferirDineroDB, debitarDineroDB, verificarAdmin, obtenerDatosAdmin, accionAdmin, consultaPolicial, accionPolicial, obtenerRecompensaDiaria, cobrarRecompensaDiaria, registrarVehiculoDB, obtenerMultasDB, pagarMultaDB, pagarTodasMultasDB, obtenerCatalogoVehiculos, sincronizarCatalogoVehiculos, comprarVehiculoTienda, obtenerEstadoCasino, comprarEntradaCasino, jugarCasino, obtenerEstadoCrypto, operarCrypto } from "./api"
 import "./App.css"
 
 function AppIcon({ name, size = 20, className = "" }) {
@@ -659,6 +659,8 @@ const secciones = [
   { id: "pertenencias", label: "Pertenencias", icon: "box" },
   { id: "municipalidad", label: "Gestión de Multas", icon: "receipt" },
   { id: "tienda", label: "Mercado", icon: "store" },
+  { id: "casino", label: "Casino", icon: "crown" },
+  { id: "crypto", label: "Crypto", icon: "money" },
   { id: "recompensas", label: "Collect Diario", icon: "gift" },
 ];
 
@@ -756,6 +758,65 @@ const armasTienda = [
   { id: 1, nombre: "Glock  17", precio: 15000, imagen: "/armas/glock.png" },
 ];
 
+const idsVehiculosLujo = React.useMemo(
+  () => new Set([31, 32, 34, 35, 36, 37, 38, 41, 42, 43, 44, 46, 48, 49, 50, 51]),
+  []
+);
+
+const aplicarAjusteLujo = React.useCallback(
+  (lista) => lista.map((vehiculo) => {
+    if (!idsVehiculosLujo.has(Number(vehiculo.id))) return vehiculo;
+    const precioBase = Number(vehiculo.precio) || 0;
+    return {
+      ...vehiculo,
+      precio: Math.round(precioBase * 1.5),
+    };
+  }),
+  [idsVehiculosLujo]
+);
+
+const stockPrevioRef = React.useRef(null);
+const catalogoBaseRef = React.useRef(null);
+
+const cargarCatalogoVehiculos = React.useCallback(async () => {
+  const catalogoAjustado = catalogoBaseRef.current || aplicarAjusteLujo(vehiculosTienda);
+  if (!catalogoBaseRef.current) {
+    catalogoBaseRef.current = catalogoAjustado;
+  }
+
+  await sincronizarCatalogoVehiculos(catalogoAjustado);
+  const data = await obtenerCatalogoVehiculos();
+  const lista = Array.isArray(data?.vehiculos) ? data.vehiculos : catalogoAjustado;
+
+  if (stockPrevioRef.current) {
+    const cambios = [];
+    for (const actual of lista) {
+      const previo = stockPrevioRef.current.find((v) => Number(v.id) === Number(actual.id));
+      if (previo && Number(actual.stock) < Number(previo.stock)) {
+        cambios.push(`${actual.nombre}: ${previo.stock} -> ${actual.stock}`);
+      }
+    }
+    if (cambios.length > 0) {
+      setToast({ type: "success", message: `Stock actualizado: ${cambios.slice(0, 2).join(" | ")}` });
+      setTimeout(() => setToast(null), 3500);
+    }
+  }
+
+  stockPrevioRef.current = lista;
+  setVehiculosTienda(lista);
+}, [aplicarAjusteLujo]);
+
+React.useEffect(() => {
+  cargarCatalogoVehiculos().catch(() => {});
+}, []);
+
+React.useEffect(() => {
+  const id = setInterval(() => {
+    cargarCatalogoVehiculos().catch(() => {});
+  }, 20000);
+  return () => clearInterval(id);
+}, [cargarCatalogoVehiculos]);
+
 const registrarLogAdmin = (accion) => {
   const logs = JSON.parse(localStorage.getItem("admin_logs")) || [];
 
@@ -809,28 +870,44 @@ useEffect(() => {
   }, [datos?.stateId]);
 
   // ================== MULTAS (Identidad / Municipalidad) ==================
-  const multasKey = `multas_${datos.nombre}`;
-  const [multasState, setMultasState] = React.useState(() => {
-    const saved = localStorage.getItem(multasKey);
-    const parsed = saved ? JSON.parse(saved) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  });
+  const [multasState, setMultasState] = React.useState([]);
+
+  const cargarMultas = React.useCallback(async () => {
+    try {
+      const data = await obtenerMultasDB(datos.slotNumber || 1);
+      setMultasState(Array.isArray(data?.multas) ? data.multas : []);
+    } catch {
+      setMultasState([]);
+    }
+  }, [datos.slotNumber]);
 
   React.useEffect(() => {
-    localStorage.setItem(multasKey, JSON.stringify(multasState));
-  }, [multasState, multasKey]);
+    cargarMultas();
+  }, [cargarMultas]);
 
   const estadoJudicial = multasState.length > 0 ? "CON ANTECEDENTES" : "LIMPIO";
 
-  // ================== PERTENENCIAS ==================
-  const pertenenciasKey = `pertenencias_${datos.nombre}`;
+  const pertenenciasKey = `pertenencias_${datos.stateId}`;
   const defaultPertenencias = { vehiculos: [], documentos: [], mochila: [] };
 
-  const licenciasKey = `licencias_${datos.nombre}`;
+  const licenciasKey = `licencias_${datos.stateId}`;
+
+  React.useEffect(() => {
+    const oldPertKey = `pertenencias_${datos.nombre}`;
+    const oldLicKey = `licencias_${datos.nombre}`;
+    if (!localStorage.getItem(pertenenciasKey) && localStorage.getItem(oldPertKey)) {
+      localStorage.setItem(pertenenciasKey, localStorage.getItem(oldPertKey));
+    }
+    if (!localStorage.getItem(licenciasKey) && localStorage.getItem(oldLicKey)) {
+      localStorage.setItem(licenciasKey, localStorage.getItem(oldLicKey));
+    }
+  }, [pertenenciasKey, licenciasKey, datos.nombre]);
 
 const [licencias, setLicencias] = React.useState(() => {
   const saved = localStorage.getItem(licenciasKey);
-  return saved ? JSON.parse(saved) : [];
+  if (saved) return JSON.parse(saved);
+  const oldSaved = localStorage.getItem(`licencias_${datos.nombre}`);
+  return oldSaved ? JSON.parse(oldSaved) : [];
 });
 
 React.useEffect(() => {
@@ -838,7 +915,8 @@ React.useEffect(() => {
 }, [licencias]);
 
   const [pertenencias, setPertenencias] = React.useState(() => {
-    const saved = localStorage.getItem(pertenenciasKey);
+    let saved = localStorage.getItem(pertenenciasKey);
+    if (!saved) saved = localStorage.getItem(`pertenencias_${datos.nombre}`);
     const parsed = saved ? JSON.parse(saved) : defaultPertenencias;
     return {
       vehiculos: Array.isArray(parsed?.vehiculos) ? parsed.vehiculos : [],
@@ -900,6 +978,11 @@ React.useEffect(() => {
   const formatUSD = (n) =>
     "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 0 });
 
+  const profesionActual = String(datos?.rol || "civil").trim();
+  const profesionLabel = profesionActual
+    ? profesionActual.charAt(0).toUpperCase() + profesionActual.slice(1)
+    : "Ciudadano";
+
   // SINCRONIZAR SALDO CON DB AL CARGAR //
   React.useEffect(() => {
     const slotNumber = datos?.slotNumber || 1;
@@ -943,7 +1026,7 @@ const comprarVehiculo = async () => {
 
     let result;
     try {
-      result = await debitarDineroDB(precio, datos.slotNumber || 1);
+      result = await comprarVehiculoTienda(compraSeleccionada.id, datos.slotNumber || 1);
     } catch (err) {
       return alert(err.message || "Error al procesar el pago.");
     }
@@ -963,7 +1046,7 @@ const comprarVehiculo = async () => {
           from: cuentaActiva.name,
           to: "Tienda Oficial",
           amount: precio,
-          motivo: `Compra vehículo: ${compraSeleccionada.nombre}`,
+          motivo: `Compra vehículo: ${result?.vehiculo?.nombre || compraSeleccionada.nombre}`,
           date: new Date().toLocaleString("es-US"),
         },
         ...prev.transactions,
@@ -1006,9 +1089,9 @@ const comprarVehiculo = async () => {
 
       const nuevoVehiculo = {
         id: Date.now(),
-        nombre: compraSeleccionada.nombre,
-        precio,
-        imagen: compraSeleccionada.imagen,
+        nombre: result?.vehiculo?.nombre || compraSeleccionada.nombre,
+        precio: Number(result?.vehiculo?.precio || precio),
+        imagen: result?.vehiculo?.imagen || compraSeleccionada.imagen,
         estado: matriculaAsignada ? "REGISTRADO" : "INSCRITO",
         matricula: matriculaAsignada || null,
         comprado: new Date().toLocaleString("es-US")
@@ -1020,14 +1103,7 @@ const comprarVehiculo = async () => {
       }));
     }
 
-    // Bajar stock
-    setVehiculosTienda((prev) =>
-      prev.map((v) =>
-        v.id === compraSeleccionada.id
-          ? { ...v, stock: Math.max(0, Number(v.stock) - 1) }
-          : v
-      )
-    );
+    await cargarCatalogoVehiculos();
 
     // Toast
     setToast({ type: "success", message: matriculaAsignada ? `Vehículo comprado y registrado: ${matriculaAsignada}` : "Vehículo comprado con éxito" });
@@ -1404,7 +1480,7 @@ const comprarItem = async () => {
 
     let result;
     try {
-      result = await debitarDineroDB(amount, datos.slotNumber || 1);
+      result = await pagarMultaDB(multaId, datos.slotNumber || 1);
     } catch (err) {
       return alert(err.message || "Error al pagar la multa. Intenta de nuevo.");
     }
@@ -1428,7 +1504,7 @@ const comprarItem = async () => {
       ],
     }));
 
-    setMultasState((prev) => prev.filter((m) => m.id !== multaId));
+    await cargarMultas();
   };
 
   const pagarTodo = async () => {
@@ -1445,7 +1521,7 @@ const comprarItem = async () => {
 
     let result;
     try {
-      result = await debitarDineroDB(amount, datos.slotNumber || 1);
+      result = await pagarTodasMultasDB(datos.slotNumber || 1);
     } catch (err) {
       return alert(err.message || "Error al pagar las multas. Intenta de nuevo.");
     }
@@ -1469,7 +1545,7 @@ const comprarItem = async () => {
       ],
     }));
 
-    setMultasState([]);
+    await cargarMultas();
   };
 
   // ================== UI ==================
@@ -1531,13 +1607,25 @@ const comprarItem = async () => {
       {/* SIDEBAR (derecha) */}
       <aside className="sidebar">
         <div className="sidebar-header">
-          <img
-            className="sidebar-logo"
-            src="/logo.png"
-            alt="Logo"
-            onError={(e) => (e.currentTarget.style.display = "none")}
-          />
-          <div className="sidebar-title">Oasis RolePlay</div>
+          <div className="sidebar-title sidebar-title-logo">
+            <span className="sidebar-o-wrap">
+              O
+              <img
+                className="sidebar-logo sidebar-logo-inline"
+                src="/logo/logo.png"
+                alt="Logo"
+                onError={(e) => {
+                  if (!e.currentTarget.dataset.fallback) {
+                    e.currentTarget.dataset.fallback = "1";
+                    e.currentTarget.src = "/logo.png";
+                    return;
+                  }
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            </span>
+            <span>asis RolePlay</span>
+          </div>
         </div>
 
         <div className="sidebar-divider" />
@@ -1688,8 +1776,8 @@ const comprarItem = async () => {
                       <AppIcon name="briefcase" size={20} />
                     </div>
                     <div>
-                      <div className="user-title">Ciudadano</div>
-                      <div className="user-sub">Nómina al día. Próximo pago pronto.</div>
+                      <div className="user-title">{profesionLabel}</div>
+                      <div className="user-sub">Nómina al día para {profesionLabel.toLowerCase()}.</div>
                     </div>
                   </div>
 
@@ -1720,6 +1808,36 @@ const comprarItem = async () => {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div className="bank-history">
+                <div className="history-title">Historial de gastos e ingresos</div>
+
+                {(bank.transactions || []).length === 0 ? (
+                  <div className="history-empty">No hay movimientos registrados.</div>
+                ) : (
+                  <div className="history-list">
+                    {(bank.transactions || []).slice(0, 15).map((tx) => {
+                      const tipo = String(tx.type || "MOVIMIENTO").toUpperCase();
+                      const esIngreso = ["INGRESO", "DEPOSIT", "DEPOSITO", "RECOMPENSA"].includes(tipo);
+                      const montoTx = Number(tx.amount || 0);
+                      const detalle = tx.motivo || tx.description || tx.to || "Sin detalle";
+
+                      return (
+                        <div key={tx.id} className="history-item">
+                          <div className="history-left">
+                            <div className="history-type">{tipo}</div>
+                            <div className="history-date">{tx.date || "Sin fecha"}</div>
+                            <div className="history-date">{detalle}</div>
+                          </div>
+                          <div className={`history-amount ${esIngreso ? "plus" : "minus"}`}>
+                            {esIngreso ? "+" : "-"}{formatUSD(montoTx)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* MODAL TRANSFERIR */}
@@ -2257,12 +2375,22 @@ const comprarItem = async () => {
   </div>
 )}
 
+              {active === "casino" && (
+                <CasinoPanel datos={datos} setBank={setBank} />
+              )}
+
+              {active === "crypto" && (
+                <CryptoPanel datos={datos} setBank={setBank} />
+              )}
+
                {/* ================= OTRAS ================= */}
               {active !== "identidad" &&
                 active !== "finanzas" &&
                 active !== "pertenencias" &&
                 active !== "municipalidad" &&
                 active !== "tienda" &&
+                active !== "casino" &&
+                active !== "crypto" &&
                 active !== "recompensas" &&
                 active !== "policia" &&
                 active !== "admin" && (
@@ -2296,11 +2424,13 @@ function RecompensasPanel({ datos, setBank }) {
   const [cargando, setCargando] = React.useState(true);
   const [cobrando, setCobrando] = React.useState(false);
   const [mensaje, setMensaje] = React.useState(null);
+  const [segundosRestantes, setSegundosRestantes] = React.useState(0);
 
   const cargarEstado = React.useCallback(async () => {
     try {
       const data = await obtenerRecompensaDiaria(datos.slotNumber || 1);
       setEstado(data);
+      setSegundosRestantes(Number(data?.proximoCobroEnSegundos || 0));
     } catch (err) {
       setMensaje({ tipo: "error", texto: err.message });
     } finally {
@@ -2309,6 +2439,21 @@ function RecompensasPanel({ datos, setBank }) {
   }, [datos.slotNumber]);
 
   React.useEffect(() => { cargarEstado(); }, [cargarEstado]);
+
+  React.useEffect(() => {
+    if (segundosRestantes <= 0) return;
+    const id = setInterval(() => {
+      setSegundosRestantes((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [segundosRestantes]);
+
+  const formatearTiempo = (totalSegundos) => {
+    const h = Math.floor(totalSegundos / 3600);
+    const m = Math.floor((totalSegundos % 3600) / 60);
+    const s = totalSegundos % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
 
   const cobrar = async () => {
     setCobrando(true);
@@ -2330,6 +2475,9 @@ function RecompensasPanel({ datos, setBank }) {
       await cargarEstado();
     } catch (err) {
       setMensaje({ tipo: "error", texto: err.message });
+      if (typeof err?.proximoCobroEnSegundos === "number") {
+        setSegundosRestantes(err.proximoCobroEnSegundos);
+      }
     } finally {
       setCobrando(false);
     }
@@ -2371,9 +2519,13 @@ function RecompensasPanel({ datos, setBank }) {
       <button
         className="recompensas-cobrar-btn"
         onClick={cobrar}
-        disabled={cobrando || estado?.yaCobrado}
+        disabled={cobrando || segundosRestantes > 0}
       >
-        {estado?.yaCobrado ? "YA COBRASTE HOY" : cobrando ? "COBRANDO..." : "COBRAR RECOMPENSA"}
+        {segundosRestantes > 0
+          ? `DISPONIBLE EN ${formatearTiempo(segundosRestantes)}`
+          : cobrando
+            ? "COBRANDO..."
+            : "COBRAR RECOMPENSA"}
       </button>
 
       {estado?.personaje && (
@@ -2381,6 +2533,183 @@ function RecompensasPanel({ datos, setBank }) {
           Saldo actual: <strong>${estado.personaje.dinero?.toLocaleString()}</strong>
         </div>
       )}
+    </div>
+  );
+}
+
+function CasinoPanel({ datos, setBank }) {
+  const [estado, setEstado] = React.useState(null);
+  const [mensaje, setMensaje] = React.useState(null);
+  const [apuesta, setApuesta] = React.useState(1000);
+  const [colorRuleta, setColorRuleta] = React.useState("rojo");
+  const [cargando, setCargando] = React.useState(false);
+
+  const cargar = React.useCallback(async () => {
+    try {
+      const data = await obtenerEstadoCasino(datos.slotNumber || 1);
+      setEstado(data);
+    } catch (err) {
+      setMensaje({ tipo: "error", texto: err.message });
+    }
+  }, [datos.slotNumber]);
+
+  React.useEffect(() => { cargar(); }, [cargar]);
+
+  const actualizarSaldo = (saldo) => {
+    if (saldo === undefined || !setBank) return;
+    setBank((prev) => ({
+      ...prev,
+      accounts: prev.accounts.map((a) => (a.id === "principal" ? { ...a, balance: Number(saldo) } : a)),
+    }));
+  };
+
+  const pagarEntrada = async () => {
+    setCargando(true);
+    try {
+      const data = await comprarEntradaCasino(datos.slotNumber || 1);
+      actualizarSaldo(data.saldo);
+      setMensaje({ tipo: "ok", texto: "Entrada comprada. Acceso permanente desbloqueado." });
+      await cargar();
+    } catch (err) {
+      setMensaje({ tipo: "error", texto: err.message });
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const ejecutarJuego = async (juego) => {
+    setCargando(true);
+    try {
+      const extra = juego === "jugar_ruleta" ? { color: colorRuleta } : {};
+      const data = await jugarCasino(juego, Number(apuesta), extra, datos.slotNumber || 1);
+      actualizarSaldo(data.saldo);
+      const balance = Number(data.ganancia || 0) - Number(data.apuesta || 0);
+      const signo = balance >= 0 ? "+" : "-";
+      setMensaje({ tipo: "ok", texto: `${data.resultado} | ${signo}$${Math.abs(balance).toLocaleString("es-US")}` });
+      await cargar();
+    } catch (err) {
+      setMensaje({ tipo: "error", texto: err.message });
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  return (
+    <div className="casino-wrap">
+      <h2>Casino Oasis</h2>
+      <p className="casino-sub">Ruleta, BlackJack y Tragamonedas.</p>
+
+      {mensaje && <div className={`casino-msg ${mensaje.tipo}`}>{mensaje.texto}</div>}
+
+      {!estado?.accesoPagado ? (
+        <div className="casino-entrada">
+          <p>Entrada única: ${Number(estado?.costoEntrada || 45000).toLocaleString("es-US")}</p>
+          <button className="casino-btn" disabled={cargando} onClick={pagarEntrada}>
+            {cargando ? "PROCESANDO..." : "PAGAR ENTRADA"}
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="casino-juegos">
+            <input type="number" min="100" value={apuesta} onChange={(e) => setApuesta(e.target.value)} placeholder="Apuesta" />
+            <select value={colorRuleta} onChange={(e) => setColorRuleta(e.target.value)}>
+              <option value="rojo">Ruleta Rojo</option>
+              <option value="negro">Ruleta Negro</option>
+              <option value="verde">Ruleta Verde</option>
+            </select>
+            <button className="casino-btn" disabled={cargando} onClick={() => ejecutarJuego("jugar_ruleta")}>Jugar Ruleta</button>
+            <button className="casino-btn" disabled={cargando} onClick={() => ejecutarJuego("jugar_blackjack")}>Jugar BlackJack</button>
+            <button className="casino-btn" disabled={cargando} onClick={() => ejecutarJuego("jugar_tragamonedas")}>Jugar Tragamonedas</button>
+          </div>
+
+          <div className="casino-historial">
+            <h3>Últimas jugadas</h3>
+            {(estado?.historial || []).length === 0 ? (
+              <p>Sin movimientos todavía.</p>
+            ) : (
+              estado.historial.map((item, idx) => (
+                <div key={`${item.created_at}_${idx}`} className="casino-item">
+                  <span>{String(item.juego || "").toUpperCase()}</span>
+                  <span>{item.resultado}</span>
+                  <span>Apuesta: ${Number(item.apuesta || 0).toLocaleString("es-US")}</span>
+                  <span>Ganancia: ${Number(item.ganancia || 0).toLocaleString("es-US")}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function CryptoPanel({ datos, setBank }) {
+  const [estado, setEstado] = React.useState(null);
+  const [mensaje, setMensaje] = React.useState(null);
+  const [moneda, setMoneda] = React.useState("OAS");
+  const [cantidad, setCantidad] = React.useState(10);
+  const [cargando, setCargando] = React.useState(false);
+
+  const cargar = React.useCallback(async () => {
+    try {
+      const data = await obtenerEstadoCrypto(datos.slotNumber || 1);
+      setEstado(data);
+    } catch (err) {
+      setMensaje({ tipo: "error", texto: err.message });
+    }
+  }, [datos.slotNumber]);
+
+  React.useEffect(() => { cargar(); }, [cargar]);
+
+  const actualizarSaldo = (saldo) => {
+    if (saldo === undefined || !setBank) return;
+    setBank((prev) => ({
+      ...prev,
+      accounts: prev.accounts.map((a) => (a.id === "principal" ? { ...a, balance: Number(saldo) } : a)),
+    }));
+  };
+
+  const ejecutarOperacion = async (accion) => {
+    setCargando(true);
+    try {
+      const data = await operarCrypto(accion, moneda, Number(cantidad), datos.slotNumber || 1);
+      actualizarSaldo(data.saldo);
+      setMensaje({ tipo: "ok", texto: `${accion === "comprar" ? "Compra" : "Venta"} ejecutada: ${moneda}` });
+      await cargar();
+    } catch (err) {
+      setMensaje({ tipo: "error", texto: err.message });
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  return (
+    <div className="crypto-wrap">
+      <h2>Crypto Mercado Ficticio</h2>
+      <p className="crypto-sub">Sistema financiero alternativo para operaciones clandestinas.</p>
+
+      {mensaje && <div className={`crypto-msg ${mensaje.tipo}`}>{mensaje.texto}</div>}
+
+      <div className="crypto-cotizaciones">
+        {Object.entries(estado?.cotizaciones || {}).map(([sigla, precio]) => (
+          <div key={sigla} className="crypto-card">
+            <strong>{sigla}</strong>
+            <span>${Number(precio).toLocaleString("es-US")}</span>
+            <small>Saldo: {Number(estado?.cartera?.[sigla] || 0)}</small>
+          </div>
+        ))}
+      </div>
+
+      <div className="crypto-ops">
+        <select value={moneda} onChange={(e) => setMoneda(e.target.value)}>
+          {Object.keys(estado?.cotizaciones || {}).map((sigla) => (
+            <option key={sigla} value={sigla}>{sigla}</option>
+          ))}
+        </select>
+        <input type="number" min="1" value={cantidad} onChange={(e) => setCantidad(e.target.value)} />
+        <button className="crypto-btn" disabled={cargando} onClick={() => ejecutarOperacion("comprar")}>Comprar</button>
+        <button className="crypto-btn" disabled={cargando} onClick={() => ejecutarOperacion("vender")}>Vender</button>
+      </div>
     </div>
   );
 }
@@ -2605,6 +2934,12 @@ function AdminPanel({ discordId }) {
   const [placaAsignar, setPlacaAsignar] = React.useState("");
   const [vipAsignar, setVipAsignar] = React.useState("");
   const [nuevoAdminId, setNuevoAdminId] = React.useState("");
+  const [tipoItemAdmin, setTipoItemAdmin] = React.useState("vehiculo");
+  const [nombreItemAdmin, setNombreItemAdmin] = React.useState("");
+  const [itemIdQuitarAdmin, setItemIdQuitarAdmin] = React.useState("");
+  const [multaMotivoAdmin, setMultaMotivoAdmin] = React.useState("");
+  const [multaMontoAdmin, setMultaMontoAdmin] = React.useState("");
+  const [multaIdQuitarAdmin, setMultaIdQuitarAdmin] = React.useState("");
 
   // Campos profesion //
   const [nuevaProfNombre, setNuevaProfNombre] = React.useState("");
@@ -2649,6 +2984,7 @@ function AdminPanel({ discordId }) {
     cargarProfesiones();
     cargarAdmins();
     cargarNiveles();
+    cargarLogs();
   }, []);
 
   const ejecutarAccion = async (accion, payload) => {
@@ -2661,6 +2997,7 @@ function AdminPanel({ discordId }) {
       if (accion.includes("profesion")) cargarProfesiones();
       if (accion.includes("admin")) cargarAdmins();
       if (accion.includes("vip")) cargarNiveles();
+      cargarLogs();
     } catch (err) {
       setMensaje({ tipo: "error", texto: err.message });
     }
@@ -2802,6 +3139,62 @@ function AdminPanel({ discordId }) {
                 }}>Desbloquear Slot</button>
               </div>
             </div>
+
+            <div className="admin-accion-grupo">
+              <h4>Agregar Vehículo / Arma</h4>
+              <div className="admin-input-row">
+                <select value={tipoItemAdmin} onChange={e => setTipoItemAdmin(e.target.value)}>
+                  <option value="vehiculo">Vehículo</option>
+                  <option value="arma">Arma</option>
+                </select>
+                <input placeholder="Nombre del item" value={nombreItemAdmin} onChange={e => setNombreItemAdmin(e.target.value)} />
+                <button className="admin-btn" onClick={() => {
+                  ejecutarAccionUsuario("agregar_item_usuario", { tipo: tipoItemAdmin, nombre: nombreItemAdmin });
+                  setNombreItemAdmin("");
+                }}>Agregar</button>
+              </div>
+            </div>
+
+            <div className="admin-accion-grupo">
+              <h4>Quitar Vehículo / Arma</h4>
+              <div className="admin-input-row">
+                <input placeholder="ID item (opcional)" value={itemIdQuitarAdmin} onChange={e => setItemIdQuitarAdmin(e.target.value)} />
+                <input placeholder="Nombre exacto del item" value={nombreItemAdmin} onChange={e => setNombreItemAdmin(e.target.value)} />
+                <button className="admin-btn-danger" onClick={() => {
+                  ejecutarAccionUsuario("quitar_item_usuario", {
+                    tipo: tipoItemAdmin,
+                    nombre: nombreItemAdmin,
+                    item_id: itemIdQuitarAdmin || undefined,
+                  });
+                  setItemIdQuitarAdmin("");
+                  setNombreItemAdmin("");
+                }}>Quitar</button>
+              </div>
+            </div>
+
+            <div className="admin-accion-grupo">
+              <h4>Agregar Multa</h4>
+              <div className="admin-input-row">
+                <input placeholder="Motivo" value={multaMotivoAdmin} onChange={e => setMultaMotivoAdmin(e.target.value)} />
+                <input type="number" placeholder="Monto" value={multaMontoAdmin} onChange={e => setMultaMontoAdmin(e.target.value)} />
+                <button className="admin-btn" onClick={() => {
+                  ejecutarAccionUsuario("agregar_multa_admin", { motivo: multaMotivoAdmin, monto: multaMontoAdmin });
+                  setMultaMotivoAdmin("");
+                  setMultaMontoAdmin("");
+                }}>Agregar Multa</button>
+              </div>
+            </div>
+
+            <div className="admin-accion-grupo">
+              <h4>Quitar Multa</h4>
+              <div className="admin-input-row">
+                <input type="number" placeholder="ID de multa" value={multaIdQuitarAdmin} onChange={e => setMultaIdQuitarAdmin(e.target.value)} />
+                <button className="admin-btn-danger" onClick={() => {
+                  ejecutarAccion("quitar_multa_admin", { multa_id: multaIdQuitarAdmin });
+                  setMultaIdQuitarAdmin("");
+                }}>Quitar Multa</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -2839,6 +3232,9 @@ function AdminPanel({ discordId }) {
             {niveles.map(n => (
               <div key={n.id} className="admin-list-item">
                 <div><strong>{n.nombre}</strong> · Recompensa: ${n.recompensa_diaria?.toLocaleString()}/día</div>
+                {String(n.nombre || "").toLowerCase() !== "ninguno" && (
+                  <button className="admin-btn-danger" onClick={() => ejecutarAccion("eliminar_vip", { id: n.id, nombre: n.nombre })}>Eliminar</button>
+                )}
               </div>
             ))}
           </div>
@@ -2885,13 +3281,17 @@ function AdminPanel({ discordId }) {
       {tab === "logs" && (
         <div className="admin-seccion">
           <div className="admin-logs">
-            {logs.map(l => (
-              <div key={l.id} className="admin-log-item">
-                <span className="admin-log-fecha">{new Date(l.created_at).toLocaleString("es-CL")}</span>
-                <span className="admin-log-accion">{l.accion}</span>
-                {l.detalles && <span className="admin-log-detalles">{l.detalles}</span>}
-              </div>
-            ))}
+            {logs.length === 0 ? (
+              <div className="admin-log-item">Sin logs registrados.</div>
+            ) : (
+              logs.map(l => (
+                <div key={l.id} className="admin-log-item">
+                  <span className="admin-log-fecha">{new Date(l.created_at).toLocaleString("es-CL")}</span>
+                  <span className="admin-log-accion">{l.admin_username || l.admin_discord_id} · {l.accion}</span>
+                  {l.detalles && <span className="admin-log-detalles">{l.detalles}</span>}
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
