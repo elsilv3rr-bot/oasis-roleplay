@@ -520,24 +520,56 @@ body { margin: 0; background: var(--oasis-navy); color: var(--oasis-text); }
   .mini-card-wide{ grid-column: auto; }
 }
 
-/* responsive sidebar */
+/* ================================================
+   RESPONSIVE MÓVIL — separado completamente del desktop
+   ================================================ */
+
+/* ---- 768px y menos ---- */
 @media (max-width: 768px) {
+
+  /* --- Prevenir overflow horizontal en toda la app --- */
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  /* --- Layout general del expediente --- */
   .expediente-layout {
     flex-direction: column;
     height: auto;
+    min-height: 100dvh;           /* dvh respeta la barra de navegación del browser */
+    overflow-x: hidden;
   }
+
+  /* --- Ocultar botón ADMIN flotante en móvil
+         (el admin accede por el drawer sin conflicto de posición) --- */
+  .admin-flotante-btn {
+    display: none !important;
+  }
+
+  /* --- Botón Discord flotante: mover a esquina inferior derecha en móvil --- */
+  .discord-flotante {
+    left: auto;
+    right: 14px;
+    bottom: 14px;
+  }
+
+  /* --- Navbar hamburguesa --- */
   .mobile-expediente-nav {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 14px;
-    background: rgba(10, 8, 32, 0.96);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    padding: 0 14px;
+    height: 54px;
+    background: rgba(10, 8, 32, 0.98);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--oasis-border);
     position: sticky;
     top: 0;
     z-index: 30;
+    width: 100%;
+    flex-shrink: 0;
   }
   .mobile-expediente-brand {
     display: flex;
@@ -545,6 +577,7 @@ body { margin: 0; background: var(--oasis-navy); color: var(--oasis-text); }
     gap: 10px;
     color: var(--oasis-text);
     font-weight: 800;
+    font-size: 15px;
     letter-spacing: 0.01em;
   }
   .mobile-expediente-logo {
@@ -558,25 +591,29 @@ body { margin: 0; background: var(--oasis-navy); color: var(--oasis-text); }
     height: 42px;
     border-radius: 12px;
     border: 1px solid var(--oasis-border);
-    background: rgba(139, 92, 246, 0.12);
+    background: rgba(139, 92, 246, 0.15);
     display: inline-flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     gap: 5px;
     cursor: pointer;
+    flex-shrink: 0;
   }
   .mobile-expediente-toggle span {
     width: 18px;
     height: 2px;
     border-radius: 2px;
     background: #f1f5f9;
+    display: block;
   }
+
+  /* --- Overlay del drawer --- */
   .mobile-expediente-overlay {
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(2, 6, 23, 0.5);
+    background: rgba(2, 6, 23, 0.6);
     opacity: 0;
     pointer-events: none;
     transition: opacity var(--transition);
@@ -586,8 +623,10 @@ body { margin: 0; background: var(--oasis-navy); color: var(--oasis-text); }
     opacity: 1;
     pointer-events: auto;
   }
+
+  /* --- Drawer lateral (sidebar) --- */
   .sidebar {
-    width: min(300px, 82vw);
+    width: min(280px, 80vw);
     height: 100vh;
     position: fixed;
     right: 0;
@@ -599,127 +638,151 @@ body { margin: 0; background: var(--oasis-navy); color: var(--oasis-text); }
     transition: transform var(--transition);
     z-index: 22;
     overflow-y: auto;
+    overflow-x: hidden;
   }
-  .sidebar.mobile-open {
-    transform: translateX(0);
-  }
+  .sidebar.mobile-open { transform: translateX(0); }
   .sidebar::before { display: none; }
   .sidebar-header { display: flex; }
   .sidebar-divider { display: block; }
-  .sidebar-menu {
-    flex-direction: column;
-    gap: 4px;
-    width: 100%;
-  }
-  .sidebar-item {
-    padding: 10px 12px;
-    white-space: normal;
-    font-size: 14px;
-  }
+  .sidebar-menu { flex-direction: column; gap: 4px; width: 100%; }
+  .sidebar-item { padding: 10px 12px; white-space: normal; font-size: 14px; }
   .sidebar-item span:last-child { display: inline; }
   .sidebar-icon { width: 22px; }
+
+  /* --- Área de contenido principal --- */
   .expediente-main {
-    height: auto;
-    padding: 20px 16px;
-    overflow-y: visible;
-  }
-  .right-list-card {
     width: 100%;
-    padding: 16px;
+    max-width: 100%;
+    padding: 16px 12px 80px; /* padding-bottom para no tapar con el botón Discord */
+    overflow-x: hidden;
+    box-sizing: border-box;
   }
+
   .expediente-title {
     width: 100%;
+    font-size: 22px;
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
-  .home-card {
-    padding: 32px 24px;
-  }
-  .home-card h1 {
-    font-size: 28px;
-  }
-  .bank-grid { grid-template-columns: 1fr; }
-  .muni-grid { grid-template-columns: 1fr; }
-  .market-wrap {
-    padding: 16px 0 8px;
-  }
-  .market-content {
-    margin-top: 14px;
-  }
-  .vehicle-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-    margin-top: 18px;
-    justify-items: stretch;
-    align-items: stretch;
-  }
-  .vehicle-card {
-    width: 100%;
-    min-width: 0;
-  }
-  .vehicle-image-section {
-    padding: 14px;
-  }
-  .vehicle-image-section img {
-    height: 98px;
-  }
-  .vehicle-info {
-    padding: 14px;
-  }
-  .vehicle-info h3 {
-    font-size: 14px;
-    line-height: 1.25;
-    min-height: 36px;
-  }
-  .stock {
-    font-size: 12px;
-  }
-  .vehicle-footer {
-    margin-top: 14px;
-    gap: 8px;
-  }
-  .vehicle-price {
-    font-size: 16px;
-  }
-  .buy-btn {
-    padding: 9px 10px;
-    font-size: 12px;
-  }
-}
 
-@media (max-width: 480px) {
-  .home-card {
-    padding: 24px 18px;
-    border-radius: var(--radius-md);
-  }
   .right-list-card {
+    width: 100%;
+    max-width: 100%;
     padding: 14px;
-    border-radius: var(--radius-md);
+    box-sizing: border-box;
+    overflow-x: hidden;
   }
-  .mini-card {
-    padding: 16px;
-  }
-  .market-wrap {
-    padding: 12px 0 6px;
-  }
+
+  /* --- Identidad --- */
+  .identidad-grid { grid-template-columns: 1fr; }
+  .mini-card-wide { grid-column: auto; }
+  .mini-card { padding: 16px; }
+
+  /* --- Finanzas --- */
+  .bank-grid { grid-template-columns: 1fr; }
+  .bank-title { font-size: 20px; }
+
+  /* --- Municipalidad --- */
+  .muni-grid { grid-template-columns: 1fr; }
+
+  /* --- Mercado --- */
+  .market-wrap { padding: 12px 0 8px; overflow: hidden; }
+  .market-header { margin-bottom: 16px; }
+  .market-title { font-size: 24px; letter-spacing: 1px; }
+  .market-sub { font-size: 13px; }
+  .market-search { max-width: 100%; }
+  .market-tabs { flex-wrap: wrap; gap: 6px; }
+  .market-content { margin-top: 12px; }
   .vehicle-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+    margin-top: 12px;
   }
-  .vehicle-image-section {
-    padding: 12px;
+  .vehicle-card { width: 100%; min-width: 0; }
+  .vehicle-image-section { padding: 12px; }
+  .vehicle-image-section img { height: 90px; }
+  .vehicle-info { padding: 12px; }
+  .vehicle-info h3 { font-size: 13px; line-height: 1.25; }
+  .stock { font-size: 11px; }
+  .vehicle-footer { margin-top: 12px; gap: 6px; flex-wrap: wrap; }
+  .vehicle-price { font-size: 15px; }
+  .buy-btn { padding: 8px 10px; font-size: 12px; }
+
+  /* --- Home card --- */
+  .home-card { padding: 28px 18px; }
+  .home-card h1 { font-size: 26px; }
+
+  /* --- Panel Admin --- */
+  .admin-wrap {
+    padding: 14px 0;
+    overflow-x: hidden;
+    width: 100%;
+    box-sizing: border-box;
   }
-  .vehicle-image-section img {
-    height: 86px;
+  .admin-acciones {
+    padding: 14px;
+    overflow-x: hidden;
   }
-  .vehicle-info {
-    padding: 12px;
+  .admin-tabs { flex-wrap: wrap; gap: 6px; }
+  .tab-btn { padding: 7px 12px; font-size: 12px; }
+
+  /* Rows de inputs/selects/botones: apilar en columna en móvil */
+  .admin-input-row {
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
   }
-  .vehicle-info h3 {
-    font-size: 13px;
-    min-height: 34px;
+  .admin-input-row input,
+  .admin-input-row select {
+    width: 100%;
+    min-width: 0;
+    flex: none;
+    box-sizing: border-box;
   }
-  .vehicle-price {
-    font-size: 15px;
+  .admin-btn {
+    width: 100%;
+    padding: 10px;
+    white-space: normal;
   }
+
+  /* --- Modales: que no excedan pantalla --- */
+  .transfer-modal,
+  .nuevo-contacto-modal,
+  .vehiculo-preview-modal {
+    width: min(92vw, 440px);
+    max-width: 92vw;
+    max-height: 90dvh;
+    overflow-y: auto;
+  }
+
+  /* --- Pertenencias tabs --- */
+  .pertenencias-tabs {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
+
+/* ---- 480px y menos ---- */
+@media (max-width: 480px) {
+  .expediente-main { padding: 12px 10px 80px; }
+
+  .right-list-card { padding: 12px; border-radius: var(--radius-md); }
+
+  .home-card { padding: 22px 16px; border-radius: var(--radius-md); }
+  .home-card h1 { font-size: 22px; }
+
+  .market-title { font-size: 20px; }
+
+  .vehicle-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .vehicle-image-section { padding: 10px; }
+  .vehicle-image-section img { height: 76px; }
+  .vehicle-info { padding: 10px; }
+  .vehicle-info h3 { font-size: 12px; }
+  .vehicle-price { font-size: 14px; }
+
+  .mini-card { padding: 14px; }
+
+  .admin-input-row { flex-direction: column; gap: 8px; }
 }
 
 /* ================= BANCA DIGITAL (FINANZAS) ================= */
