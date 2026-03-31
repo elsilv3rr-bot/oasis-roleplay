@@ -1,7 +1,7 @@
 import React from "react"
 import { useState, useEffect } from "react"
 import { Routes, Route, useNavigate, useSearchParams } from "react-router-dom"
-import { iniciarLoginDiscord, obtenerSlotsPersonajes, desbloquearSlotPersonaje, obtenerUsuario, registrarPersonaje, setToken, cerrarSesion, obtenerSaldoDB, transferirDineroDB, verificarAdmin, obtenerDatosAdmin, accionAdmin, consultaPolicial, accionPolicial, obtenerRecompensaDiaria, cobrarRecompensaDiaria, registrarVehiculoDB, obtenerMultasDB, pagarMultaDB, pagarTodasMultasDB, obtenerCatalogoVehiculos, obtenerItemsMercado, sincronizarCatalogoVehiculos, sincronizarItemsMercado, comprarVehiculoTienda, comprarItemTienda, obtenerEstadoCasino, comprarEntradaCasino, jugarCasino, obtenerEstadoCrypto, operarCrypto } from "./api"
+import { iniciarLoginDiscord, obtenerSlotsPersonajes, desbloquearSlotPersonaje, obtenerUsuario, registrarPersonaje, setToken, cerrarSesion, obtenerSaldoDB, transferirDineroDB, verificarAdmin, obtenerDatosAdmin, accionAdmin, consultaPolicial, accionPolicial, obtenerRecompensaDiaria, cobrarRecompensaDiaria, registrarVehiculoDB, obtenerMultasDB, pagarMultaDB, pagarTodasMultasDB, obtenerCatalogoVehiculos, obtenerItemsMercado, sincronizarCatalogoVehiculos, sincronizarItemsMercado, comprarVehiculoTienda, comprarItemTienda, obtenerEstadoCasino, comprarEntradaCasino, jugarCasino, obtenerEstadoCrypto, operarCrypto, obtenerCatalogoTiendaCompleto } from "./api"
 import Misiones from "./modules/misiones/Misiones"
 import Facciones from "./modules/facciones/Facciones"
 import Leaderboard from "./modules/leaderboard/Leaderboard"
@@ -749,158 +749,36 @@ const secciones = [
     verificarAdmin().then(setEsAdminUsuario).catch(() => {});
   }, []);
 
-  const [vehiculosTienda, setVehiculosTienda] = React.useState([
-    { id: 1, nombre: "Wolfsburgo Marin", precio: 15000, stock: 250, imagen: "/autos/Marin.png" },
-    { id: 2, nombre: "Wolfsburg Discovery", precio: 16500, stock: 200, imagen: "/autos/Discovery.png" },
-    { id: 3, nombre: "Wolfsburg Classic", precio: 18000, stock: 200, imagen: "/autos/Classic.png" },
-    { id: 4, nombre: "BKM 1 Cabriolet", precio: 18500, stock: 150, imagen: "/autos/Cabriolet.png" },
-    { id: 5, nombre: "Quad", precio: 18500, stock: 90, imagen: "/autos/Quad.png" },
-    { id: 6, nombre: "Wolfsburg Handel", precio: 19000, stock: 200, imagen: "/autos/Handel.png" },
-    { id: 7, nombre: "Avantismo S5", precio: 15000, stock: 180, imagen: "/autos/S5.png" },
-    { id: 8, nombre: "Wolfsburg Karen", precio: 15400, stock: 180, imagen: "/autos/Karen.png" },
-    { id: 9, nombre: "UTV", precio: 17500, stock: 100, imagen: "/autos/UTV.png" },
-    { id: 10, nombre: "Stuttgart W123", precio: 19000, stock: 100, imagen: "/autos/W123.png" },
-    { id: 11, nombre: "Nordforge Striker 450", precio: 19000, stock: 85, imagen: "/autos/Striker-450.png" },
-    { id: 12, nombre: "Stuttgart Kasten", precio: 20000, stock: 120, imagen: "/autos/Kasten.png" },
-    { id: 13, nombre: "Stuttgart eKasten", precio: 21000, stock: 120, imagen: "/autos/eKasten.png" },
-    { id: 14, nombre: "Stuttgart Executive", precio: 35000, stock: 100, imagen: "/autos/Executive.png" },
-    { id: 15, nombre: "Avantismo A3", precio: 17500, stock: 180, imagen: "/autos/A3.png" },
-    { id: 16, nombre: "Stuttgart Jogger", precio: 20000, stock: 50, imagen: "/autos/Jogger.png" },
-    { id: 17, nombre: "Wolfsburg T6", precio: 21000, stock: 90, imagen: "/autos/T6.png" },
-    { id: 18, nombre: "BKM M3 E90", precio: 20000, stock: 85, imagen: "/autos/E90.png" },
-    { id: 19, nombre: "Stuttgart GMA 63", precio: 25000, stock: 85, imagen: "/autos/63.png" },
-    { id: 20, nombre: "Falcon Traveller", precio: 20500, stock: 180, imagen: "/autos/Traveller.png" },
-    { id: 21, nombre: "Wolfsburg Pickup", precio: 27500, stock: 140, imagen: "/autos/Pickup.png" },
-    { id: 22, nombre: "Avantismo Q4 Electron", precio: 21000, stock: 85, imagen: "/autos/Electron.png" },
-    { id: 23, nombre: "Tractor", precio: 9000, stock: 5, imagen: "/autos/Tractor.png" },
-    { id: 24, nombre: "Avantismo A6", precio: 30000, stock: 120, imagen: "/autos/A6.png" },
-    { id: 25, nombre: "Cuvora Atrica", precio: 27000, stock: 140, imagen: "/autos/Atrica.png" },
-    { id: 26, nombre: "Celestial Type S", precio: 25000, stock: 150, imagen: "/autos/Type-S.png" },
-    { id: 27, nombre: "Avantismo Q5", precio: 30000, stock: 120, imagen: "/autos/Q5.png" },
-    { id: 28, nombre: "Stuttgart GMA C63 Facelift", precio: 34000, stock: 145, imagen: "/autos/Facelift.png" },
-    { id: 29, nombre: "BKM M2", precio: 38500, stock: 90, imagen: "/autos/M2.png" },
-    { id: 30, nombre: "Stuttgart Landschaft", precio: 40000, stock: 50, imagen: "/autos/Landschaft.png" },
-    { id: 31, nombre: "Avantismo R8", precio: 50000, stock: 15, imagen: "/autos/R8.png" },
-    { id: 32, nombre: "Stuttgart GMA Roadster", precio: 52000, stock: 8, imagen: "/autos/Roadster.png" },
-    { id: 33, nombre: "BKM X3", precio: 49500, stock: 60, imagen: "/autos/X3.png" },
-    { id: 34, nombre: "BKM M5", precio: 54000, stock: 75, imagen: "/autos/M5.png" },
-    { id: 35, nombre: "Stuttgart GMA Sport", precio: 55500, stock: 25, imagen: "/autos/Sport.png" },
-    { id: 36, nombre: "BKM M3 G80", precio: 50000, stock: 35, imagen: "/autos/G80.png" },
-    { id: 37, nombre: "Ferdinand 911", precio: 48500, stock: 15, imagen: "/autos/911.png" },
-    { id: 38, nombre: "Ferdinand 911 Cabriolet", precio: 49000, stock: 10, imagen: "/autos/911-cabriolet.png" },
-    { id: 39, nombre: "Stuttgart GMA Commute", precio: 38500, stock: 80, imagen: "/autos/Commute.png" },
-    { id: 40, nombre: "Bullhorn Prancer SFP Fury", precio: 38000, stock: 80, imagen: "/autos/Fury.png" },
-    { id: 41, nombre: "Avantismo RS4", precio: 51000, stock: 85, imagen: "/autos/RS4.png" },
-    { id: 42, nombre: "Ferdinand Jalapeno", precio: 51000, stock: 65, imagen: "/autos/Jalapeno.png" },
-    { id: 43, nombre: "Silhouette Urano", precio: 54500, stock: 45, imagen: "/autos/Urano.png" },
-    { id: 44, nombre: "Maranello Catania", precio: 60000, stock: 25, imagen: "/autos/Catania.png" },
-    { id: 45, nombre: "Chryslus Champion Limousine", precio: 50000, stock: 10, imagen: "/autos/Limousine.png" },
-    { id: 46, nombre: "Ferdinand Vivo", precio: 58000, stock: 10, imagen: "/autos/Vivo.png" },
-    { id: 47, nombre: "Stuttgart Royal Majestic", precio: 55500, stock: 25, imagen: "/autos/Majestic.png" },
-    { id: 48, nombre: "Silhouette Carbon", precio: 80000, stock: 5, imagen: "/autos/Carbon.png" },
-    { id: 49, nombre: "Mauntley National GT", precio: 85000, stock: 4, imagen: "/autos/GT.png" },
-    { id: 50, nombre: "Strugatti Ettore", precio: 100000, stock: 3, imagen: "/autos/Ettore.png" },
-    { id: 51, nombre: "Nyberg Eskon", precio: 150000, stock: 2, imagen: "/autos/Eskon.png" },
-    { id: 52, nombre: "BKM 1200 Tourer", precio: 9000, stock: 20, imagen: "/autos/Tourer.png" },
-    { id: 53, nombre: "Vellfire XY6", precio: 12000, stock: 20, imagen: "/autos/XY6.png" },
-    { id: 54, nombre: "Vellfire R1", precio: 18500, stock: 20, imagen: "/autos/R1.png" },
-    { id: 55, nombre: "Falcon Grinder", precio: 30000, stock: 100, imagen: "/autos/raptor-citizen.png" },
-  ]);
-  const [documentosTienda, setDocumentosTienda] = React.useState([
-    { id: 1, tipo: "documento", nombre: "Licencia de Conducir", precio: 1500, stock: 9999, imagen: "/licencias/licencia.png" },
-    { id: 2, tipo: "documento", nombre: "Licencia de Motos", precio: 1000, stock: 9999, imagen: "/licencias/licencia.png" },
-    { id: 3, tipo: "documento", nombre: "Licencia de Camiones", precio: 2000, stock: 9999, imagen: "/licencias/licencia.png" },
-    { id: 4, tipo: "documento", nombre: "Licencia de Buses", precio: 1500, stock: 9999, imagen: "/licencias/licencia.png" },
-    { id: 5, tipo: "documento", nombre: "Licencia de Tractor", precio: 1500, stock: 9999, imagen: "/licencias/licencia.png" },
-    { id: 6, tipo: "documento", nombre: "Licencia de Armas", precio: 2500, stock: 9999, imagen: "/licencias/licencia.png" },
-  ]);
-  const [armasTienda, setArmasTienda] = React.useState([
-    { id: 101, tipo: "arma", nombre: "Glock 17", precio: 15000, stock: 9999, imagen: "/armas/glock.png" },
-  ]);
+  const [vehiculosTienda, setVehiculosTienda] = React.useState([]);
+  const [documentosTienda, setDocumentosTienda] = React.useState([]);
+  const [armasTienda, setArmasTienda] = React.useState([]);
+  const [tiendaCargando, setTiendaCargando] = React.useState(true);
 
-const idsVehiculosLujo = React.useMemo(
-  () => new Set([31, 32, 34, 35, 36, 37, 38, 41, 42, 43, 44, 46, 48, 49, 50, 51]),
-  []
-);
-
-const aplicarAjusteLujo = React.useCallback(
-  (lista) => lista.map((vehiculo) => {
-    if (!idsVehiculosLujo.has(Number(vehiculo.id))) return vehiculo;
-    const precioBase = Number(vehiculo.precio) || 0;
-    return {
-      ...vehiculo,
-      precio: Math.round(precioBase * 1.5),
-    };
-  }),
-  [idsVehiculosLujo]
-);
-
-const stockPrevioRef = React.useRef(null);
-const catalogoBaseRef = React.useRef(null);
-const itemsPrevioRef = React.useRef(null);
-const itemsBaseRef = React.useRef(null);
-
-const cargarCatalogoVehiculos = React.useCallback(async () => {
-  const catalogoAjustado = catalogoBaseRef.current || aplicarAjusteLujo(vehiculosTienda);
-  if (!catalogoBaseRef.current) {
-    catalogoBaseRef.current = catalogoAjustado;
+const cargarCatalogoTienda = React.useCallback(async () => {
+  try {
+    const data = await obtenerCatalogoTiendaCompleto();
+    setVehiculosTienda(data.vehiculos);
+    const docs = data.items.filter((item) => String(item.tipo) === "documento");
+    const armas = data.items.filter((item) => String(item.tipo) === "arma");
+    setDocumentosTienda(docs);
+    setArmasTienda(armas);
+  } catch {
+    // Silenciar errores de carga
+  } finally {
+    setTiendaCargando(false);
   }
-
-  await sincronizarCatalogoVehiculos(catalogoAjustado);
-  const data = await obtenerCatalogoVehiculos();
-  const lista = Array.isArray(data?.vehiculos) ? data.vehiculos : catalogoAjustado;
-
-  if (stockPrevioRef.current) {
-    const cambios = [];
-    for (const actual of lista) {
-      const previo = stockPrevioRef.current.find((v) => Number(v.id) === Number(actual.id));
-      if (previo && Number(actual.stock) < Number(previo.stock)) {
-        cambios.push(`${actual.nombre}: ${previo.stock} -> ${actual.stock}`);
-      }
-    }
-    if (cambios.length > 0) {
-      setToast({ type: "success", message: `Stock actualizado: ${cambios.slice(0, 2).join(" | ")}` });
-      setTimeout(() => setToast(null), 3500);
-    }
-  }
-
-  stockPrevioRef.current = lista;
-  setVehiculosTienda(lista);
-}, [aplicarAjusteLujo]);
-
-const cargarItemsMercado = React.useCallback(async () => {
-  const itemsBase = itemsBaseRef.current || [...documentosTienda, ...armasTienda];
-  if (!itemsBaseRef.current) {
-    itemsBaseRef.current = itemsBase;
-  }
-
-  await sincronizarItemsMercado(itemsBase);
-  const data = await obtenerItemsMercado();
-  const lista = Array.isArray(data?.items) ? data.items : itemsBase;
-
-  const docs = lista.filter((item) => String(item.tipo) === "documento");
-  const armas = lista.filter((item) => String(item.tipo) === "arma");
-
-  itemsPrevioRef.current = lista;
-  setDocumentosTienda(docs);
-  setArmasTienda(armas);
 }, []);
 
 React.useEffect(() => {
-  cargarCatalogoVehiculos().catch(() => {});
-}, []);
-
-React.useEffect(() => {
-  cargarItemsMercado().catch(() => {});
-}, [cargarItemsMercado]);
+  cargarCatalogoTienda();
+}, [cargarCatalogoTienda]);
 
 React.useEffect(() => {
   const id = setInterval(() => {
-    cargarCatalogoVehiculos().catch(() => {});
-    cargarItemsMercado().catch(() => {});
+    cargarCatalogoTienda();
   }, 20000);
   return () => clearInterval(id);
-}, [cargarCatalogoVehiculos, cargarItemsMercado]);
+}, [cargarCatalogoTienda]);
 
 const registrarLogAdmin = (accion) => {
   const logs = JSON.parse(localStorage.getItem("admin_logs")) || [];
@@ -1197,7 +1075,7 @@ const comprarVehiculo = async () => {
       }));
     }
 
-    await cargarCatalogoVehiculos();
+    await cargarCatalogoTienda();
 
     // Toast
     setToast({ type: "success", message: matriculaAsignada ? `Vehículo comprado y registrado: ${matriculaAsignada}` : "Vehículo comprado con éxito" });
@@ -2324,6 +2202,12 @@ const comprarItem = async () => {
 
     <div className="market-content">
 
+{tiendaCargando && (
+  <div style={{ textAlign: "center", padding: "2rem", color: "#aaa" }}>
+    Cargando catálogo...
+  </div>
+)}
+
 {vehiculoPreview && (
   <div className="modal-backdrop" onClick={() => setVehiculoPreview(null)}>
     <div className="vehiculo-preview-modal" onClick={(e) => e.stopPropagation()}>
@@ -2427,6 +2311,11 @@ const comprarItem = async () => {
       {/* ================= DOCUMENTOS ================= */}
       {tiendaTab === "documentos" && (
         <div className="vehicle-grid">
+          {documentosTienda.length === 0 && !tiendaCargando && (
+            <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "2rem", color: "#aaa" }}>
+              No hay documentos disponibles en la tienda.
+            </div>
+          )}
           {documentosTienda.map((doc) => (
             <div className="vehicle-card" key={doc.id}>
               <div className="vehicle-image-section">
@@ -2466,6 +2355,11 @@ const comprarItem = async () => {
       {/* ================= VEHICULOS ================= */}
       {tiendaTab === "vehiculos" && (
         <div className="vehicle-grid">
+          {vehiculosTienda.length === 0 && !tiendaCargando && (
+            <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "2rem", color: "#aaa" }}>
+              No hay vehículos disponibles en la tienda.
+            </div>
+          )}
           {vehiculosTienda.map((auto) => (
             <div className="vehicle-card" key={auto.id}>
               <div className="vehicle-image-section">
@@ -2500,6 +2394,11 @@ const comprarItem = async () => {
       {/* ================= ARMAS ================= */}
       {tiendaTab === "armas" && (
         <div className="vehicle-grid">
+          {armasTienda.length === 0 && !tiendaCargando && (
+            <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "2rem", color: "#aaa" }}>
+              No hay armas disponibles en la tienda.
+            </div>
+          )}
           {armasTienda.map((arma) => (
             <div className="vehicle-card" key={arma.id}>
               <div className="vehicle-image-section">
@@ -3145,6 +3044,16 @@ function AdminPanel({ discordId }) {
   const [itemStockId, setItemStockId] = React.useState("");
   const [itemStockDelta, setItemStockDelta] = React.useState("1");
 
+  // Campos tienda CRUD //
+  const [tiendaSubTab, setTiendaSubTab] = React.useState("vehiculos");
+  const [tiendaEditando, setTiendaEditando] = React.useState(null);
+  const [tiendaFormNombre, setTiendaFormNombre] = React.useState("");
+  const [tiendaFormPrecio, setTiendaFormPrecio] = React.useState("");
+  const [tiendaFormStock, setTiendaFormStock] = React.useState("");
+  const [tiendaFormImagen, setTiendaFormImagen] = React.useState("");
+  const [tiendaFormCategoria, setTiendaFormCategoria] = React.useState("standard");
+  const [tiendaFormTipo, setTiendaFormTipo] = React.useState("documento");
+
   // Campos profesion //
   const [nuevaProfNombre, setNuevaProfNombre] = React.useState("");
   const [nuevaProfDesc, setNuevaProfDesc] = React.useState("");
@@ -3231,7 +3140,7 @@ function AdminPanel({ discordId }) {
       if (accion.includes("profesion")) cargarProfesiones();
       if (accion.includes("admin")) cargarAdmins();
       if (accion.includes("vip")) cargarNiveles();
-      if (accion.includes("stock")) cargarStockMercado();
+      if (accion.includes("stock") || accion.includes("vehiculo_tienda") || accion.includes("item_tienda")) cargarStockMercado();
       if (accion.includes("eliminar_personaje") || accion.includes("eliminar_perfil")) {
         if (usuariosCargados) cargarUsuariosRegistrados(adminBusquedaUsuarios);
       }
@@ -3266,6 +3175,7 @@ function AdminPanel({ discordId }) {
         {[
           { id: "usuarios", label: "Usuarios" },
           { id: "administracion", label: "Administración" },
+          { id: "tienda", label: "Tienda" },
           { id: "profesiones", label: "Profesiones" },
           { id: "vip", label: "Niveles VIP" },
           { id: "admins", label: "Administradores" },
@@ -3575,6 +3485,214 @@ function AdminPanel({ discordId }) {
             </div>
 
             <button className="admin-btn" onClick={cargarStockMercado}>Recargar stock</button>
+          </div>
+        </div>
+      )}
+
+      {/* GESTION DE TIENDA DINAMICA */}
+      {tab === "tienda" && (
+        <div className="admin-seccion">
+          <div className="admin-acciones">
+            <h3>Gestión de Catálogo de Tienda</h3>
+            <p style={{ color: "#aaa", fontSize: "0.85rem", marginBottom: "1rem" }}>
+              Agrega, edita o elimina los artículos que aparecen en la Tienda Oficial.
+            </p>
+
+            <div className="admin-tabs" style={{ marginBottom: "1rem" }}>
+              {[
+                { id: "vehiculos", label: "Vehículos" },
+                { id: "documentos", label: "Documentos" },
+                { id: "armas", label: "Armas" },
+              ].map(st => (
+                <button
+                  key={st.id}
+                  className={`tab-btn ${tiendaSubTab === st.id ? "active" : ""}`}
+                  onClick={() => { setTiendaSubTab(st.id); setTiendaEditando(null); }}
+                >
+                  {st.label}
+                </button>
+              ))}
+            </div>
+
+            {/* FORMULARIO CREAR / EDITAR */}
+            <div className="admin-form-crear" style={{ marginBottom: "1.5rem" }}>
+              <h4>{tiendaEditando ? "Editar artículo" : "Crear artículo nuevo"}</h4>
+              <input placeholder="Nombre" value={tiendaFormNombre} onChange={e => setTiendaFormNombre(e.target.value)} />
+              <input type="number" placeholder="Precio" value={tiendaFormPrecio} onChange={e => setTiendaFormPrecio(e.target.value)} />
+              <input type="number" placeholder="Stock" value={tiendaFormStock} onChange={e => setTiendaFormStock(e.target.value)} />
+              <input placeholder="URL de imagen (ej: /autos/nombre.png)" value={tiendaFormImagen} onChange={e => setTiendaFormImagen(e.target.value)} />
+
+              {tiendaSubTab === "vehiculos" && (
+                <select value={tiendaFormCategoria} onChange={e => setTiendaFormCategoria(e.target.value)}>
+                  <option value="standard">Standard</option>
+                  <option value="lujo">Lujo</option>
+                  <option value="deportivo">Deportivo</option>
+                  <option value="moto">Moto</option>
+                  <option value="utilitario">Utilitario</option>
+                </select>
+              )}
+
+              {(tiendaSubTab === "documentos" || tiendaSubTab === "armas") && (
+                <select value={tiendaFormTipo} onChange={e => setTiendaFormTipo(e.target.value)}>
+                  <option value="documento">Documento</option>
+                  <option value="arma">Arma</option>
+                </select>
+              )}
+
+              <div className="admin-input-row">
+                <button className="admin-btn" onClick={async () => {
+                  if (tiendaSubTab === "vehiculos") {
+                    if (tiendaEditando) {
+                      await ejecutarAccion("editar_vehiculo_tienda", {
+                        vehiculo_id: tiendaEditando.id,
+                        nombre: tiendaFormNombre,
+                        precio: tiendaFormPrecio,
+                        stock: tiendaFormStock,
+                        imagen: tiendaFormImagen,
+                        categoria: tiendaFormCategoria,
+                      });
+                    } else {
+                      await ejecutarAccion("crear_vehiculo_tienda", {
+                        nombre: tiendaFormNombre,
+                        precio: tiendaFormPrecio,
+                        stock: tiendaFormStock,
+                        imagen: tiendaFormImagen,
+                        categoria: tiendaFormCategoria,
+                      });
+                    }
+                  } else {
+                    const tipoFinal = tiendaSubTab === "armas" ? "arma" : tiendaFormTipo;
+                    if (tiendaEditando) {
+                      await ejecutarAccion("editar_item_tienda", {
+                        item_id: tiendaEditando.id,
+                        tipo: tipoFinal,
+                        nombre: tiendaFormNombre,
+                        precio: tiendaFormPrecio,
+                        stock: tiendaFormStock,
+                        imagen: tiendaFormImagen,
+                      });
+                    } else {
+                      await ejecutarAccion("crear_item_tienda", {
+                        tipo: tipoFinal,
+                        nombre: tiendaFormNombre,
+                        precio: tiendaFormPrecio,
+                        stock: tiendaFormStock,
+                        imagen: tiendaFormImagen,
+                      });
+                    }
+                  }
+                  setTiendaFormNombre(""); setTiendaFormPrecio(""); setTiendaFormStock("");
+                  setTiendaFormImagen(""); setTiendaFormCategoria("standard"); setTiendaFormTipo("documento");
+                  setTiendaEditando(null);
+                  cargarStockMercado();
+                }}>
+                  {tiendaEditando ? "Guardar Cambios" : "Crear"}
+                </button>
+
+                {tiendaEditando && (
+                  <button className="admin-btn-danger" onClick={() => {
+                    setTiendaEditando(null);
+                    setTiendaFormNombre(""); setTiendaFormPrecio(""); setTiendaFormStock("");
+                    setTiendaFormImagen(""); setTiendaFormCategoria("standard"); setTiendaFormTipo("documento");
+                  }}>Cancelar</button>
+                )}
+              </div>
+            </div>
+
+            {/* LISTA DE VEHICULOS */}
+            {tiendaSubTab === "vehiculos" && (
+              <div className="admin-lista">
+                {vehiculosStock.length === 0 ? (
+                  <div className="admin-list-item">No hay vehículos en la tienda.</div>
+                ) : vehiculosStock.map(v => (
+                  <div key={v.id} className="admin-list-item">
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      {v.imagen && <img src={v.imagen} alt={v.nombre} style={{ width: 48, height: 48, objectFit: "contain", borderRadius: 6, background: "#1a1a2e" }} />}
+                      <div>
+                        <strong>{v.nombre}</strong> · ${Number(v.precio).toLocaleString("es-US")}
+                        <div className="admin-list-desc">ID: {v.id} · Stock: {v.stock} · Cat: {v.categoria || "standard"}</div>
+                      </div>
+                    </div>
+                    <div className="admin-input-row" style={{ marginTop: 8 }}>
+                      <button className="admin-btn" onClick={() => {
+                        setTiendaEditando(v);
+                        setTiendaFormNombre(v.nombre);
+                        setTiendaFormPrecio(String(v.precio));
+                        setTiendaFormStock(String(v.stock));
+                        setTiendaFormImagen(v.imagen || "");
+                        setTiendaFormCategoria(v.categoria || "standard");
+                      }}>Editar</button>
+                      <button className="admin-btn-danger" onClick={() => {
+                        ejecutarAccion("eliminar_vehiculo_tienda", { vehiculo_id: v.id });
+                      }}>Eliminar</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* LISTA DE DOCUMENTOS */}
+            {tiendaSubTab === "documentos" && (
+              <div className="admin-lista">
+                {itemsStock.filter(it => it.tipo === "documento").length === 0 ? (
+                  <div className="admin-list-item">No hay documentos en la tienda.</div>
+                ) : itemsStock.filter(it => it.tipo === "documento").map(it => (
+                  <div key={`doc-${it.id}`} className="admin-list-item">
+                    <div>
+                      <strong>{it.nombre}</strong> · ${Number(it.precio).toLocaleString("es-US")}
+                      <div className="admin-list-desc">ID: {it.id} · Stock: {it.stock} · Tipo: documento</div>
+                    </div>
+                    <div className="admin-input-row" style={{ marginTop: 8 }}>
+                      <button className="admin-btn" onClick={() => {
+                        setTiendaEditando(it);
+                        setTiendaFormNombre(it.nombre);
+                        setTiendaFormPrecio(String(it.precio));
+                        setTiendaFormStock(String(it.stock));
+                        setTiendaFormImagen(it.imagen || "");
+                        setTiendaFormTipo("documento");
+                      }}>Editar</button>
+                      <button className="admin-btn-danger" onClick={() => {
+                        ejecutarAccion("eliminar_item_tienda", { item_id: it.id });
+                      }}>Eliminar</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* LISTA DE ARMAS */}
+            {tiendaSubTab === "armas" && (
+              <div className="admin-lista">
+                {itemsStock.filter(it => it.tipo === "arma").length === 0 ? (
+                  <div className="admin-list-item">No hay armas en la tienda.</div>
+                ) : itemsStock.filter(it => it.tipo === "arma").map(it => (
+                  <div key={`arma-${it.id}`} className="admin-list-item">
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      {it.imagen && <img src={it.imagen} alt={it.nombre} style={{ width: 48, height: 48, objectFit: "contain", borderRadius: 6, background: "#1a1a2e" }} />}
+                      <div>
+                        <strong>{it.nombre}</strong> · ${Number(it.precio).toLocaleString("es-US")}
+                        <div className="admin-list-desc">ID: {it.id} · Stock: {it.stock} · Tipo: arma</div>
+                      </div>
+                    </div>
+                    <div className="admin-input-row" style={{ marginTop: 8 }}>
+                      <button className="admin-btn" onClick={() => {
+                        setTiendaEditando(it);
+                        setTiendaFormNombre(it.nombre);
+                        setTiendaFormPrecio(String(it.precio));
+                        setTiendaFormStock(String(it.stock));
+                        setTiendaFormImagen(it.imagen || "");
+                        setTiendaFormTipo("arma");
+                      }}>Editar</button>
+                      <button className="admin-btn-danger" onClick={() => {
+                        ejecutarAccion("eliminar_item_tienda", { item_id: it.id });
+                      }}>Eliminar</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button className="admin-btn" style={{ marginTop: "1rem" }} onClick={cargarStockMercado}>Recargar catálogo</button>
           </div>
         </div>
       )}

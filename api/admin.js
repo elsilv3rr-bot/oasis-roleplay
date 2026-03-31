@@ -70,6 +70,17 @@ async function registrarLogAdmin(connection, adminDiscordId, accion, objetivoDis
   );
 }
 
+async function tieneCategoriaVehiculo(connection) {
+  const [rows] = await connection.execute(
+    `SELECT COUNT(*) AS total
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'vehiculos_tienda'
+       AND COLUMN_NAME = 'categoria'`
+  );
+  return Number(rows?.[0]?.total || 0) > 0;
+}
+
 export default async function handler(req, res) {
   aplicarHeaders(res);
 
@@ -175,8 +186,11 @@ export default async function handler(req, res) {
       }
 
       if (accion === "mercado_stock") {
+        const hayCategoria = await tieneCategoriaVehiculo(connection);
         const [vehiculos] = await connection.execute(
-          "SELECT id_vehiculo AS id, nombre, precio_actual AS precio, stock_global AS stock, imagen_url AS imagen FROM vehiculos_tienda ORDER BY id_vehiculo ASC"
+          hayCategoria
+            ? "SELECT id_vehiculo AS id, nombre, precio_actual AS precio, stock_global AS stock, imagen_url AS imagen, categoria FROM vehiculos_tienda ORDER BY id_vehiculo ASC"
+            : "SELECT id_vehiculo AS id, nombre, precio_actual AS precio, stock_global AS stock, imagen_url AS imagen, 'standard' AS categoria FROM vehiculos_tienda ORDER BY id_vehiculo ASC"
         );
 
         const [items] = await connection.execute(
@@ -1177,6 +1191,168 @@ export default async function handler(req, res) {
         `Infractor StateID: ${multaRows[0].stateid_infractor}`
       );
 
+      return res.status(200).json({ ok: true });
+    }
+
+    // ═══════════ CRUD TIENDA DINAMICA ═══════════ //
+
+    // Crear vehiculo en tienda //
+    if (accion === "crear_vehiculo_tienda") {
+      const nombre = sanitizar(String(body.nombre || "")).trim();
+      const precio = Math.floor(Number(body.precio));
+      const stock = Math.max(0, Math.floor(Number(body.stock || 0)));
+      const imagen = String(body.imagen || "").trim();
+      const categoria = sanitizar(String(body.categoria || "standard")).toLowerCase().trim();
+
+      if (!nombre || !precio || precio <= 0) {
+        return res.status(400).json({ error: "nombre y precio validos son requeridos" });
+      }
+
+      const hayCategoria = await tieneCategoriaVehiculo(connection);
+      const [result] = await connection.execute(
+        hayCategoria
+          ? `INSERT INTO vehiculos_tienda (nombre, precio_actual, stock_global, imagen_url, categoria)
+             VALUES (?, ?, ?, ?, ?)`
+          : `INSERT INTO vehiculos_tienda (nombre, precio_actual, stock_global, imagen_url)
+             VALUES (?, ?, ?, ?)`,
+        hayCategoria
+          ? [nombre, precio, stock, imagen, categoria]
+          : [nombre, precio, stock, imagen]
+      );
+
+      await registrarLogAdmin(connection, decoded.discordId, `Creo vehiculo tienda "${nombre}"`, null, `Precio: $${precio} · Stock: ${stock}`);
+      return res.status(200).json({ ok: true, id: result.insertId });
+    }
+
+    // Editar vehiculo en tienda //
+    if (accion === "editar_vehiculo_tienda") {
+      const vehiculoId = Number(body.vehiculo_id);
+      if (!vehiculoId) return res.status(400).json({ error: "vehiculo_id requerido" });
+
+      const nombre = sanitizar(String(body.nombre || "")).trim();
+      const precio = Math.floor(Number(body.precio));
+      const stock = Math.max(0, Math.floor(Number(body.stock)));
+      const imagen = String(body.imagen || "").trim();
+      const categoria = sanitizar(String(body.categoria || "")).toLowerCase().trim();
+
+      if (!nombre || !precio || precio <= 0) {
+        return res.status(400).json({ error: "nombre y precio validos son requeridos" });
+      }
+
+      const hayCategoria = await tieneCategoriaVehiculo(connection);
+      const [result] = await connection.execute(
+        hayCategoria
+          ? `UPDATE vehiculos_tienda SET nombre = ?, precio_actual = ?, stock_global = ?, imagen_url = ?, categoria = ?
+             WHERE id_vehiculo = ?`
+          : `UPDATE vehiculos_tienda SET nombre = ?, precio_actual = ?, stock_global = ?, imagen_url = ?
+             WHERE id_vehiculo = ?`,
+        hayCategoria
+          ? [nombre, precio, stock, imagen, categoria || "standard", vehiculoId]
+          : [nombre, precio, stock, imagen, vehiculoId]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Vehiculo no encontrado" });
+      }
+
+      await registrarLogAdmin(connection, decoded.discordId, `Edito vehiculo tienda ID ${vehiculoId}`, null, `${nombre} · $${precio} · Stock: ${stock}`);
+      return res.status(200).json({ ok: true });
+    }
+
+    // Eliminar vehiculo de tienda //
+    if (accion === "eliminar_vehiculo_tienda") {
+      const vehiculoId = Number(body.vehiculo_id);
+      if (!vehiculoId) return res.status(400).json({ error: "vehiculo_id requerido" });
+
+      const [rows] = await connection.execute(
+        "SELECT nombre FROM vehiculos_tienda WHERE id_vehiculo = ? LIMIT 1",
+        [vehiculoId]
+      );
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: "Vehiculo no encontrado" });
+      }
+
+      await connection.execute("DELETE FROM vehiculos_tienda WHERE id_vehiculo = ?", [vehiculoId]);
+      await registrarLogAdmin(connection, decoded.discordId, `Elimino vehiculo tienda ID ${vehiculoId}`, null, `Nombre: ${rows[0].nombre}`);
+      return res.status(200).json({ ok: true });
+    }
+
+    // Crear item en tienda (documento/arma) //
+    if (accion === "crear_item_tienda") {
+      const tipo = sanitizar(String(body.tipo || "")).toLowerCase().trim();
+      const nombre = sanitizar(String(body.nombre || "")).trim();
+      const precio = Math.floor(Number(body.precio));
+      const stock = Math.max(0, Math.floor(Number(body.stock || 0)));
+      const imagen = String(body.imagen || "").trim();
+
+      if (!["arma", "documento"].includes(tipo)) {
+        return res.status(400).json({ error: "tipo debe ser arma o documento" });
+      }
+
+      if (!nombre || !precio || precio <= 0) {
+        return res.status(400).json({ error: "nombre y precio validos son requeridos" });
+      }
+
+      const [result] = await connection.execute(
+        `INSERT INTO mercado_items (tipo, nombre, precio_actual, stock_global, imagen_url)
+         VALUES (?, ?, ?, ?, ?)`,
+        [tipo, nombre, precio, stock, imagen]
+      );
+
+      await registrarLogAdmin(connection, decoded.discordId, `Creo item tienda "${nombre}"`, null, `Tipo: ${tipo} · Precio: $${precio} · Stock: ${stock}`);
+      return res.status(200).json({ ok: true, id: result.insertId });
+    }
+
+    // Editar item de tienda //
+    if (accion === "editar_item_tienda") {
+      const itemId = Number(body.item_id);
+      if (!itemId) return res.status(400).json({ error: "item_id requerido" });
+
+      const tipo = sanitizar(String(body.tipo || "")).toLowerCase().trim();
+      const nombre = sanitizar(String(body.nombre || "")).trim();
+      const precio = Math.floor(Number(body.precio));
+      const stock = Math.max(0, Math.floor(Number(body.stock)));
+      const imagen = String(body.imagen || "").trim();
+
+      if (!["arma", "documento"].includes(tipo)) {
+        return res.status(400).json({ error: "tipo debe ser arma o documento" });
+      }
+
+      if (!nombre || !precio || precio <= 0) {
+        return res.status(400).json({ error: "nombre y precio validos son requeridos" });
+      }
+
+      const [result] = await connection.execute(
+        `UPDATE mercado_items SET tipo = ?, nombre = ?, precio_actual = ?, stock_global = ?, imagen_url = ?
+         WHERE id_item = ?`,
+        [tipo, nombre, precio, stock, imagen, itemId]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Item no encontrado" });
+      }
+
+      await registrarLogAdmin(connection, decoded.discordId, `Edito item tienda ID ${itemId}`, null, `${tipo}/${nombre} · $${precio} · Stock: ${stock}`);
+      return res.status(200).json({ ok: true });
+    }
+
+    // Eliminar item de tienda //
+    if (accion === "eliminar_item_tienda") {
+      const itemId = Number(body.item_id);
+      if (!itemId) return res.status(400).json({ error: "item_id requerido" });
+
+      const [rows] = await connection.execute(
+        "SELECT nombre, tipo FROM mercado_items WHERE id_item = ? LIMIT 1",
+        [itemId]
+      );
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: "Item no encontrado" });
+      }
+
+      await connection.execute("DELETE FROM mercado_items WHERE id_item = ?", [itemId]);
+      await registrarLogAdmin(connection, decoded.discordId, `Elimino item tienda ID ${itemId}`, null, `${rows[0].tipo}/${rows[0].nombre}`);
       return res.status(200).json({ ok: true });
     }
 

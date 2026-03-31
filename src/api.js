@@ -779,6 +779,26 @@ async function inscribirEvento(eventoId, slotNumber = 1) {
   return data;
 }
 
+// ─── TIENDA DINAMICA ───
+async function obtenerCatalogoTiendaCompleto() {
+  const token = getToken();
+  if (!token) return { vehiculos: [], items: [] };
+
+  const [catData, itemsData] = await Promise.all([
+    fetch(`${API_URL}/banco?accion=tienda_catalogo`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(r => r.json()).catch(() => ({})),
+    fetch(`${API_URL}/banco?accion=tienda_items`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(r => r.json()).catch(() => ({})),
+  ]);
+
+  return {
+    vehiculos: Array.isArray(catData?.vehiculos) ? catData.vehiculos : [],
+    items: Array.isArray(itemsData?.items) ? itemsData.items : [],
+  };
+}
+
 export {
   getToken,
   setToken,
@@ -831,5 +851,7 @@ export {
   comprarOfertaMercado,
   obtenerEventosActivos,
   inscribirEvento,
+  // Tienda dinamica admin
+  obtenerCatalogoTiendaCompleto,
 };
 

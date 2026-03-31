@@ -54,6 +54,17 @@ async function obtenerPersonaje(connection, discordId, slotNumber, conBloqueo = 
   return rows.length > 0 ? rows[0] : null;
 }
 
+async function tieneCategoriaVehiculo(connection) {
+  const [rows] = await connection.execute(
+    `SELECT COUNT(*) AS total
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'vehiculos_tienda'
+       AND COLUMN_NAME = 'categoria'`
+  );
+  return Number(rows?.[0]?.total || 0) > 0;
+}
+
 export default async function handler(req, res) {
   aplicarHeaders(res);
 
@@ -105,8 +116,11 @@ export default async function handler(req, res) {
       }
 
       if (accion === "tienda_catalogo") {
+        const hayCategoria = await tieneCategoriaVehiculo(connection);
         const [rows] = await connection.execute(
-          "SELECT id_vehiculo AS id, nombre, precio_actual AS precio, stock_global AS stock, imagen_url AS imagen FROM vehiculos_tienda ORDER BY id_vehiculo ASC"
+          hayCategoria
+            ? "SELECT id_vehiculo AS id, nombre, precio_actual AS precio, stock_global AS stock, imagen_url AS imagen, categoria FROM vehiculos_tienda ORDER BY id_vehiculo ASC"
+            : "SELECT id_vehiculo AS id, nombre, precio_actual AS precio, stock_global AS stock, imagen_url AS imagen, 'standard' AS categoria FROM vehiculos_tienda ORDER BY id_vehiculo ASC"
         );
         return res.status(200).json({ ok: true, vehiculos: rows });
       }
