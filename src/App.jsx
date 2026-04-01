@@ -1,13 +1,26 @@
 import React from "react"
 import { useState, useEffect } from "react"
 import { Routes, Route, useNavigate, useSearchParams } from "react-router-dom"
-import { iniciarLoginDiscord, obtenerSlotsPersonajes, desbloquearSlotPersonaje, obtenerUsuario, registrarPersonaje, setToken, cerrarSesion, obtenerSaldoDB, transferirDineroDB, verificarAdmin, obtenerDatosAdmin, accionAdmin, consultaPolicial, accionPolicial, obtenerRecompensaDiaria, cobrarRecompensaDiaria, registrarVehiculoDB, obtenerMultasDB, pagarMultaDB, pagarTodasMultasDB, obtenerCatalogoVehiculos, obtenerItemsMercado, sincronizarCatalogoVehiculos, sincronizarItemsMercado, comprarVehiculoTienda, comprarItemTienda, obtenerEstadoCasino, comprarEntradaCasino, jugarCasino, obtenerEstadoCrypto, operarCrypto, obtenerCatalogoTiendaCompleto } from "./api"
+import { iniciarLoginDiscord, obtenerSlotsPersonajes, desbloquearSlotPersonaje, obtenerUsuario, registrarPersonaje, setToken, cerrarSesion, obtenerSaldoDB, transferirDineroDB, verificarAdmin, obtenerDatosAdmin, accionAdmin, consultaPolicial, accionPolicial, obtenerRecompensaDiaria, cobrarRecompensaDiaria, registrarVehiculoDB, obtenerMultasDB, pagarMultaDB, pagarTodasMultasDB, obtenerCatalogoVehiculos, obtenerItemsMercado, sincronizarCatalogoVehiculos, sincronizarItemsMercado, comprarVehiculoTienda, comprarItemTienda, obtenerEstadoCasino, comprarEntradaCasino, jugarCasino, obtenerEstadoCrypto, operarCrypto, obtenerCatalogoTiendaCompleto, miFaccion } from "./api"
 import Misiones from "./modules/misiones/Misiones"
 import Facciones from "./modules/facciones/Facciones"
 import Leaderboard from "./modules/leaderboard/Leaderboard"
 import MercadoP2P from "./modules/mercadop2p/MercadoP2P"
 import Eventos from "./modules/eventos/Eventos"
 import "./App.css"
+
+function normalizarTexto(value = "") {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function esFaccionPoliciaOasis(nombreFaccion = "") {
+  const nombre = normalizarTexto(nombreFaccion);
+  return nombre === "policia de oasis" || (nombre.includes("policia") && nombre.includes("oasis"));
+}
 
 function AppIcon({ name, size = 20, className = "" }) {
   const iconProps = {
@@ -744,6 +757,7 @@ function Expediente() {
 
   // ESTADO DEL PANEL FLOTANTE DE DISCORD //
   const [discordPanelOpen, setDiscordPanelOpen] = React.useState(false);
+  const [membresiaFaccion, setMembresiaFaccion] = React.useState(null);
 
   React.useEffect(() => {
     const verificarAcceso = async () => {
@@ -770,12 +784,31 @@ function Expediente() {
       localStorage.setItem("usuario", JSON.stringify(selectedCharacter));
       localStorage.setItem("active_slot_number", String(selectedCharacter.slotNumber));
       setDatos(selectedCharacter);
+
+      try {
+        const faccionData = await miFaccion(selectedCharacter.slotNumber || activeSlotNumber);
+        setMembresiaFaccion(faccionData?.enFaccion ? faccionData.membresia : null);
+      } catch {
+        setMembresiaFaccion(null);
+      }
     };
 
     verificarAcceso();
   }, [discordUser, navigate]);
 
+  const [gestionPolicialStateId, setGestionPolicialStateId] = React.useState("");
+  const [gestionPolicialMotivo, setGestionPolicialMotivo] = React.useState("");
+  const [gestionPolicialMonto, setGestionPolicialMonto] = React.useState("");
+  const [gestionPolicialCargo, setGestionPolicialCargo] = React.useState("");
+  const [gestionPolicialGravedad, setGestionPolicialGravedad] = React.useState("leve");
+  const [gestionPolicialMensaje, setGestionPolicialMensaje] = React.useState(null);
+  const [gestionPolicialCargando, setGestionPolicialCargando] = React.useState(false);
+
   if (!datos) return null;
+
+  const esPoliciaRol = normalizarTexto(datos?.rol) === "policia";
+  const pertenecePoliciaOasis = esFaccionPoliciaOasis(membresiaFaccion?.faccion_nombre);
+  const tienePermisoPolicial = esPoliciaRol || pertenecePoliciaOasis;
 
   // ================== SECCIONES (sidebar) ==================
 const secciones = [
@@ -794,8 +827,8 @@ const secciones = [
   { id: "eventos", label: "Eventos", icon: "calendar" },
 ];
 
-  // Seccion policia: solo visible si el rol es policia //
-  const esPolicia = datos.rol === "policia";
+  // Seccion policia: visible si el personaje tiene rol policial o pertenece a Policia de Oasis //
+  const esPolicia = tienePermisoPolicial;
 
   if (esPolicia) {
     secciones.push({ id: "policia", label: "Policía", icon: "shield" });
@@ -1616,6 +1649,71 @@ const comprarItem = async () => {
     await cargarMultas();
   };
 
+  const ejecutarAccionPolicialMunicipal = async (accion, payload, successMessage) => {
+    const stateid = gestionPolicialStateId.trim();
+    if (!stateid) {
+      setGestionPolicialMensaje({ tipo: "error", texto: "Debes ingresar un StateID" });
+      return;
+    }
+
+    setGestionPolicialCargando(true);
+    setGestionPolicialMensaje(null);
+
+    try {
+      await accionPolicial({ accion, slotNumber: datos.slotNumber || 1, ...payload });
+      setGestionPolicialMensaje({ tipo: "ok", texto: successMessage });
+
+      if (accion === "imponer_multa") {
+        setGestionPolicialMotivo("");
+        setGestionPolicialMonto("");
+      }
+
+      if (accion === "agregar_cargo") {
+        setGestionPolicialCargo("");
+        setGestionPolicialGravedad("leve");
+      }
+    } catch (err) {
+      setGestionPolicialMensaje({ tipo: "error", texto: err.message || "No se pudo completar la acción policial" });
+    } finally {
+      setGestionPolicialCargando(false);
+    }
+  };
+
+  const imponerMultaDesdeMunicipalidad = async () => {
+    const monto = Number(gestionPolicialMonto);
+    if (!gestionPolicialMotivo.trim() || !monto || monto <= 0) {
+      setGestionPolicialMensaje({ tipo: "error", texto: "Completa motivo y monto válido para la multa" });
+      return;
+    }
+
+    await ejecutarAccionPolicialMunicipal(
+      "imponer_multa",
+      {
+        stateid_infractor: gestionPolicialStateId.trim(),
+        motivo: gestionPolicialMotivo.trim(),
+        monto,
+      },
+      "Multa registrada correctamente"
+    );
+  };
+
+  const registrarCargoDesdeMunicipalidad = async () => {
+    if (!gestionPolicialCargo.trim()) {
+      setGestionPolicialMensaje({ tipo: "error", texto: "Debes ingresar el cargo judicial" });
+      return;
+    }
+
+    await ejecutarAccionPolicialMunicipal(
+      "agregar_cargo",
+      {
+        stateid_acusado: gestionPolicialStateId.trim(),
+        cargo: gestionPolicialCargo.trim(),
+        gravedad: gestionPolicialGravedad,
+      },
+      "Cargo judicial registrado correctamente"
+    );
+  };
+
   // ================== UI ==================
   return (
     <div className="expediente-layout">
@@ -2200,6 +2298,72 @@ const comprarItem = async () => {
                     </div>
                   </div>
                 </div>
+
+                {tienePermisoPolicial && (
+                  <div className="muni-card">
+                    <div className="muni-card-head">
+                      <span className="muni-card-icon">
+                        <AppIcon name="shield" size={18} />
+                      </span>
+                      <span className="muni-card-title">Acciones Policiales</span>
+                    </div>
+
+                    <div className="muni-card-body">
+                      <div className="muni-note" style={{ marginBottom: 12 }}>
+                        Disponible solo para personajes con rol policial o miembros de la facción Policía de Oasis.
+                      </div>
+
+                      {gestionPolicialMensaje && (
+                        <div className={`policia-msg ${gestionPolicialMensaje.tipo}`} style={{ marginBottom: 12 }}>
+                          {gestionPolicialMensaje.texto}
+                        </div>
+                      )}
+
+                      <div className="policia-seccion" style={{ padding: 0, background: "transparent", border: "none", gap: 10 }}>
+                        <input
+                          placeholder="StateID del usuario"
+                          value={gestionPolicialStateId}
+                          onChange={(e) => setGestionPolicialStateId(e.target.value)}
+                        />
+
+                        <input
+                          placeholder="Motivo de la multa"
+                          value={gestionPolicialMotivo}
+                          onChange={(e) => setGestionPolicialMotivo(e.target.value)}
+                        />
+
+                        <div className="policia-input-row">
+                          <input
+                            type="number"
+                            placeholder="Monto de la multa"
+                            value={gestionPolicialMonto}
+                            onChange={(e) => setGestionPolicialMonto(e.target.value)}
+                          />
+                          <button className="policia-btn" onClick={imponerMultaDesdeMunicipalidad} disabled={gestionPolicialCargando}>
+                            {gestionPolicialCargando ? "Procesando..." : "Agregar multa"}
+                          </button>
+                        </div>
+
+                        <input
+                          placeholder="Cargo judicial"
+                          value={gestionPolicialCargo}
+                          onChange={(e) => setGestionPolicialCargo(e.target.value)}
+                        />
+
+                        <div className="policia-input-row">
+                          <select value={gestionPolicialGravedad} onChange={(e) => setGestionPolicialGravedad(e.target.value)}>
+                            <option value="leve">Leve</option>
+                            <option value="moderado">Moderado</option>
+                            <option value="grave">Grave</option>
+                          </select>
+                          <button className="policia-btn" onClick={registrarCargoDesdeMunicipalidad} disabled={gestionPolicialCargando}>
+                            {gestionPolicialCargando ? "Procesando..." : "Agregar cargo"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="muni-card">
                   <div className="muni-card-head">

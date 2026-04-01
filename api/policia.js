@@ -34,6 +34,20 @@ function parseVipStack(rawValue) {
   return unique;
 }
 
+function normalizarTexto(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function esFaccionPoliciaOasis(nombreFaccion) {
+  const nombreNormalizado = normalizarTexto(nombreFaccion);
+  return nombreNormalizado === "policia de oasis"
+    || (nombreNormalizado.includes("policia") && nombreNormalizado.includes("oasis"));
+}
+
 export default async function handler(req, res) {
   aplicarHeaders(res);
 
@@ -58,7 +72,7 @@ export default async function handler(req, res) {
     connection = await crearConexion();
     const body = parseBody(req.body);
 
-    // Verificar que el usuario es policia //
+    // Verificar que el usuario es policia o pertenece a la faccion Policia de Oasis //
     const slotNumber = parseInt(req.query.slotNumber || body?.slotNumber || "1", 10);
 
     const [oficialRows] = await connection.execute(
@@ -72,8 +86,20 @@ export default async function handler(req, res) {
 
     const oficial = oficialRows[0];
 
-    if (oficial.rol !== "policia") {
-      return res.status(403).json({ error: "No tienes acceso policial. Necesitas rol de policia." });
+    const [membresiaRows] = await connection.execute(
+      `SELECT f.nombre AS faccion_nombre
+       FROM faccion_miembros fm
+       JOIN facciones f ON f.id = fm.faccion_id
+       WHERE fm.discord_id = ? AND fm.slot_number = ?
+       LIMIT 1`,
+      [decoded.discordId, slotNumber]
+    );
+
+    const faccionNombre = membresiaRows[0]?.faccion_nombre || "";
+    const tieneAccesoPolicial = oficial.rol === "policia" || esFaccionPoliciaOasis(faccionNombre);
+
+    if (!tieneAccesoPolicial) {
+      return res.status(403).json({ error: "No tienes acceso policial. Necesitas rol de policia o pertenecer a Policia de Oasis." });
     }
 
     // GET: consultas //
