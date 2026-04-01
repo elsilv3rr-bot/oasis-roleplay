@@ -2875,7 +2875,8 @@ body::after {
   align-items: stretch;
   justify-content: stretch;
   padding: 28px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .registro-overlay {
@@ -3227,6 +3228,9 @@ body::after {
 
 @media (max-width: 640px) {
   .registro-container {
+    min-height: 100dvh;
+    align-items: flex-start;
+    justify-content: flex-start;
     padding: 16px;
   }
 
@@ -3234,14 +3238,17 @@ body::after {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    min-height: auto;
   }
 
   .registro-selector-panel {
     order: 1;
+    min-height: auto;
   }
 
   .registro-showcase {
     order: 2;
+    min-height: auto;
   }
 
   .registro-showcase-panel,

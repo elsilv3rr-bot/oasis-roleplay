@@ -622,7 +622,7 @@ function Registro() {
         <section className="registro-selector-panel">
           <div className="registro-selector-card">
             <div className="registro-selector-header">
-              <span className="registro-panel-kicker">Derecha</span>
+              <span className="registro-panel-kicker">Usuarios</span>
               <h2>Bienvenido a Oasis Roleplay</h2>
               <p className="registro-subtitle">Selecciona un personaje para continuar o crea uno nuevo en un slot libre.</p>
             </div>
