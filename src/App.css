@@ -3052,6 +3052,29 @@ body::after {
   padding: 22px;
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(168, 85, 247, 0.75) rgba(255, 255, 255, 0.08);
+}
+
+.registro-selector-card::-webkit-scrollbar {
+  width: 10px;
+}
+
+.registro-selector-card::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  margin: 10px 0;
+}
+
+.registro-selector-card::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(236, 72, 153, 0.9), rgba(124, 58, 237, 0.95));
+  border-radius: 999px;
+  border: 2px solid rgba(10, 16, 26, 0.55);
+  box-shadow: 0 0 12px rgba(124, 58, 237, 0.35);
+}
+
+.registro-selector-card::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(244, 114, 182, 0.95), rgba(139, 92, 246, 1));
 }
 
 .registro-selector-header {
@@ -3208,7 +3231,17 @@ body::after {
   }
 
   .registro-layout {
+    display: flex;
+    flex-direction: column;
     gap: 16px;
+  }
+
+  .registro-selector-panel {
+    order: 1;
+  }
+
+  .registro-showcase {
+    order: 2;
   }
 
   .registro-showcase-panel,
