@@ -1194,6 +1194,40 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    if (accion === "quitar_cargo_admin") {
+      const { cargo_id } = body;
+      const cargoIdNum = Number(cargo_id);
+      if (!cargoIdNum) {
+        return res.status(400).json({ error: "cargo_id requerido" });
+      }
+
+      const [cargoRows] = await connection.execute(
+        "SELECT stateid_acusado, cargo, gravedad FROM cargos_judiciales WHERE id = ? LIMIT 1",
+        [cargoIdNum]
+      );
+
+      if (cargoRows.length === 0) {
+        return res.status(404).json({ error: "Cargo no encontrado" });
+      }
+
+      const [userRows] = await connection.execute(
+        "SELECT discord_id FROM usuarios WHERE stateid = ? LIMIT 1",
+        [String(cargoRows[0].stateid_acusado || "")]
+      );
+
+      await connection.execute("DELETE FROM cargos_judiciales WHERE id = ?", [cargoIdNum]);
+
+      await registrarLogAdmin(
+        connection,
+        decoded.discordId,
+        `Elimino cargo judicial ID ${cargoIdNum}`,
+        userRows.length > 0 ? userRows[0].discord_id : null,
+        `Acusado StateID: ${cargoRows[0].stateid_acusado} · Cargo: ${cargoRows[0].cargo} · Gravedad: ${cargoRows[0].gravedad}`
+      );
+
+      return res.status(200).json({ ok: true });
+    }
+
     // ═══════════ CRUD TIENDA DINAMICA ═══════════ //
 
     // Crear vehiculo en tienda //

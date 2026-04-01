@@ -649,42 +649,6 @@ body { margin: 0; background: var(--oasis-navy); color: var(--oasis-text); }
   .sidebar-item span:last-child { display: inline; }
   .sidebar-icon { width: 22px; }
 
-  /* --- Área de contenido principal --- */
-  .expediente-main {
-    width: 100%;
-    max-width: 100%;
-    padding: 16px 12px 80px; /* padding-bottom para no tapar con el botón Discord */
-    overflow-x: hidden;
-    box-sizing: border-box;
-  }
-
-  .expediente-title {
-    width: 100%;
-    font-size: 22px;
-    overflow-wrap: break-word;
-    word-break: break-word;
-  }
-
-  .right-list-card {
-    width: 100%;
-    max-width: 100%;
-    padding: 14px;
-    box-sizing: border-box;
-    overflow-x: hidden;
-  }
-
-  /* --- Identidad --- */
-  .identidad-grid { grid-template-columns: 1fr; }
-  .mini-card-wide { grid-column: auto; }
-  .mini-card { padding: 16px; }
-
-  /* --- Finanzas --- */
-  .bank-grid { grid-template-columns: 1fr; }
-  .bank-title { font-size: 20px; }
-
-  /* --- Municipalidad --- */
-  .muni-grid { grid-template-columns: 1fr; }
-
   /* --- Mercado --- */
   .market-wrap { padding: 12px 0 8px; overflow: hidden; }
   .market-header { margin-bottom: 16px; }
@@ -693,20 +657,6 @@ body { margin: 0; background: var(--oasis-navy); color: var(--oasis-text); }
   .market-search { max-width: 100%; }
   .market-tabs { flex-wrap: wrap; gap: 6px; }
   .market-content { margin-top: 12px; }
-  .vehicle-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    margin-top: 12px;
-  }
-  .vehicle-card { width: 100%; min-width: 0; }
-  .vehicle-image-section { padding: 12px; }
-  .vehicle-image-section img { height: 90px; }
-  .vehicle-info { padding: 12px; }
-  .vehicle-info h3 { font-size: 13px; line-height: 1.25; }
-  .stock { font-size: 11px; }
-  .vehicle-footer { margin-top: 12px; gap: 6px; flex-wrap: wrap; }
-  .vehicle-price { font-size: 15px; }
-  .buy-btn { padding: 8px 10px; font-size: 12px; }
 
   /* --- Home card --- */
   .home-card { padding: 28px 18px; }
@@ -754,20 +704,10 @@ body { margin: 0; background: var(--oasis-navy); color: var(--oasis-text); }
     max-height: 90dvh;
     overflow-y: auto;
   }
-
-  /* --- Pertenencias tabs --- */
-  .pertenencias-tabs {
-    flex-wrap: wrap;
-    gap: 6px;
-  }
 }
 
 /* ---- 480px y menos ---- */
 @media (max-width: 480px) {
-  .expediente-main { padding: 12px 10px 80px; }
-
-  .right-list-card { padding: 12px; border-radius: var(--radius-md); }
-
   .home-card { padding: 22px 16px; border-radius: var(--radius-md); }
   .home-card h1 { font-size: 22px; }
 
@@ -779,8 +719,6 @@ body { margin: 0; background: var(--oasis-navy); color: var(--oasis-text); }
   .vehicle-info { padding: 10px; }
   .vehicle-info h3 { font-size: 12px; }
   .vehicle-price { font-size: 14px; }
-
-  .mini-card { padding: 14px; }
 
   .admin-input-row { flex-direction: column; gap: 8px; }
 }
@@ -2932,20 +2870,203 @@ body::after {
 
 /* ================= SLOTS DE PERSONAJE ================= */
 .registro-container {
-  background: transparent;
+  position: relative;
+  min-height: 100vh;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 28px;
+  overflow: hidden;
 }
 
-.registro-card.registro-card-wide {
-  width: min(1040px, 96vw);
-  background: rgba(13, 11, 46, 0.65);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--oasis-border);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3), 0 0 40px rgba(107,63,160,0.06);
+.registro-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(5, 8, 18, 0.78) 0%, rgba(5, 8, 18, 0.5) 38%, rgba(5, 8, 18, 0.72) 100%),
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.06), transparent 48%);
+  z-index: 0;
+}
+
+.registro-layout {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(320px, 430px) minmax(340px, 460px);
+  justify-content: space-between;
+  align-items: start;
+  gap: 28px;
+}
+
+.registro-showcase {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-self: start;
+  max-width: 430px;
+}
+
+.registro-showcase-panel,
+.registro-selector-card {
+  background: rgba(10, 16, 26, 0.54);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+
+.registro-showcase-panel {
+  border-radius: 20px;
+  padding: 18px;
+}
+
+.registro-panel-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.registro-panel-kicker {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.registro-panel-head h3 {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.registro-shop-card {
+  display: block;
+  overflow: hidden;
+  border-radius: 16px;
+  text-decoration: none;
+  color: inherit;
+  background: linear-gradient(180deg, rgba(44, 104, 229, 0.55), rgba(9, 14, 24, 0.82));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+
+.registro-shop-card:hover,
+.registro-vip-card:hover,
+.slot-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.24);
+}
+
+.registro-shop-image {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+}
+
+.registro-shop-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+}
+
+.registro-shop-tag {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.registro-shop-content strong {
+  font-size: 18px;
+}
+
+.registro-shop-content span:last-child {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.registro-vip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.registro-vip-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  text-decoration: none;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+
+.registro-vip-card.ruby {
+  background: linear-gradient(135deg, rgba(143, 28, 60, 0.92), rgba(224, 88, 120, 0.72));
+}
+
+.registro-vip-card.zafiro {
+  background: linear-gradient(135deg, rgba(11, 69, 138, 0.92), rgba(57, 146, 255, 0.7));
+}
+
+.registro-vip-card.diamante {
+  background: linear-gradient(135deg, rgba(54, 63, 88, 0.96), rgba(154, 176, 214, 0.74));
+}
+
+.registro-vip-name {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.registro-vip-link {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.registro-selector-panel {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.registro-selector-card {
+  width: min(460px, 100%);
+  border-radius: 24px;
+  padding: 22px;
+}
+
+.registro-selector-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.registro-selector-header h2 {
+  font-size: clamp(28px, 3vw, 38px);
+  line-height: 1.05;
+  font-weight: 900;
+  color: #fff;
 }
 
 .registro-subtitle {
   color: rgba(255, 255, 255, 0.78);
-  margin-top: -6px;
+  margin-top: 0;
+  line-height: 1.5;
 }
 
 .registro-feedback {
@@ -2966,13 +3087,12 @@ body::after {
 }
 
 .character-slots-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
 .slot-loading {
-  grid-column: 1 / -1;
   color: rgba(255, 255, 255, 0.8);
   padding: 10px 0;
 }
@@ -2982,9 +3102,12 @@ body::after {
   background: rgba(20, 14, 56, 0.5);
   border: 1px solid var(--oasis-border);
   border-radius: var(--radius-md);
-  padding: 14px;
+  padding: 16px;
   color: #fff;
   transition: all var(--transition);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .slot-card.empty {
@@ -3004,8 +3127,17 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
   font-weight: 800;
+}
+
+.slot-title {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.slot-meta {
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 14px;
 }
 
 .slot-badge {
@@ -3020,10 +3152,12 @@ body::after {
 }
 
 .registro-form-wrap {
-  margin-top: 8px;
+  margin-top: 18px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .registro-form-wrap h3 {
@@ -3045,15 +3179,44 @@ body::after {
   outline: none;
 }
 
-@media (max-width: 1000px) {
-  .character-slots-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 1100px) {
+  .registro-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .registro-showcase,
+  .registro-selector-card {
+    max-width: none;
+    width: 100%;
   }
 }
 
 @media (max-width: 640px) {
-  .character-slots-grid {
-    grid-template-columns: 1fr;
+  .registro-container {
+    padding: 16px;
+  }
+
+  .registro-layout {
+    gap: 16px;
+  }
+
+  .registro-showcase-panel,
+  .registro-selector-card {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .registro-shop-image {
+    height: 150px;
+  }
+
+  .registro-selector-header h2 {
+    font-size: 28px;
+  }
+
+  .registro-vip-card {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
@@ -3637,6 +3800,265 @@ body::after {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+@media (max-width: 768px) {
+  .expediente-layout {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+    flex-direction: column;
+  }
+
+  .sidebar {
+    height: 100dvh;
+    max-width: 82vw;
+  }
+
+  .expediente-main {
+    height: auto;
+    min-height: calc(100dvh - 54px);
+    overflow: visible;
+    padding: 14px 12px 96px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .expediente-title,
+  .right-list-card,
+  .bank-wrap,
+  .pertenencias-wrap,
+  .muni-wrap,
+  .market-wrap,
+  .casino-wrap,
+  .crypto-wrap {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .right-list-card {
+    margin-top: 12px;
+    padding: 14px;
+    border-radius: 18px;
+    overflow: visible;
+  }
+
+  .identidad-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .mini-card,
+  .muni-card,
+  .bank-card,
+  .bank-usercard,
+  .bank-ops,
+  .doc-card,
+  .vehiculo-card,
+  .vehicle-card,
+  .mochila-item {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .mini-card {
+    padding: 16px;
+  }
+
+  .right-list,
+  .mini-card p,
+  .mini-card li,
+  .slot-meta,
+  .history-date,
+  .muni-history-motivo,
+  .muni-fine-code,
+  .doc-card p,
+  .vehiculo-card,
+  .vehicle-info h3 {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .identidad-grid .multa-item {
+    display: block;
+    padding: 0 0 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .identidad-grid .multa-item hr {
+    display: none;
+  }
+
+  .pertenencias-wrap,
+  .market-wrap {
+    padding: 0;
+  }
+
+  .pertenencias-tabs,
+  .market-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .tab-btn,
+  .pertenencias-tabs button {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .vehiculos-grid,
+  .vehicle-grid,
+  .documentos-grid,
+  .mochila-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .doc-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .bank-grid,
+  .ops-grid,
+  .bank-accounts,
+  .muni-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bank-card {
+    padding: 16px;
+  }
+
+  .bank-balance {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .money,
+  .money-amount {
+    font-size: 22px;
+    letter-spacing: 0.04em;
+  }
+
+  .bank-card-footer,
+  .history-item,
+  .muni-fine,
+  .muni-history-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .right {
+    text-align: left;
+  }
+
+  .op-btn {
+    min-height: 72px;
+    padding: 14px;
+  }
+
+  .bank-history {
+    padding: 14px;
+    margin-top: 16px;
+  }
+
+  .history-item {
+    gap: 8px;
+  }
+
+  .history-amount {
+    align-self: flex-start;
+  }
+
+  .muni-hero {
+    padding: 16px;
+  }
+
+  .muni-title {
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  .muni-fines,
+  .muni-history {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .muni-pay,
+  .muni-payall,
+  .portal-button,
+  .modal-submit {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .modal,
+  .modal.small,
+  .transfer-modal,
+  .contact-modal,
+  .vehiculo-preview-modal {
+    width: min(92vw, 420px);
+    max-width: 92vw;
+    max-height: 88dvh;
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .mobile-expediente-nav {
+    padding: 0 10px;
+  }
+
+  .expediente-main {
+    padding: 12px 10px 92px;
+  }
+
+  .right-list-card,
+  .mini-card,
+  .muni-card,
+  .bank-card,
+  .bank-usercard,
+  .bank-ops,
+  .doc-card,
+  .vehiculo-card,
+  .vehicle-card,
+  .mochila-item {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .expediente-title {
+    font-size: 20px;
+  }
+
+  .bank-label,
+  .small,
+  .muni-note,
+  .tag,
+  .history-date {
+    font-size: 11px;
+  }
+
+  .money,
+  .money-amount,
+  .muni-total-amount {
+    font-size: 20px;
+  }
+
+  .pertenencias-tabs,
+  .market-tabs {
+    grid-template-columns: 1fr;
+  }
 }
 
 .casino-sub,

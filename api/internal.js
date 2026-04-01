@@ -12,6 +12,19 @@ import { verificarOrigenBot } from "../lib/api/auth.js";
 import { registrarEvento } from "../lib/api/eventos.js";
 import { sanitizar } from "../lib/api/validacion.js";
 
+function resolverDiscordIdSolicitado(valor, auth) {
+  const discordId = sanitizar(valor || "");
+
+  if (discordId === "me") {
+    if (auth.origen !== "web" || !auth?.usuario?.discordId) {
+      return "";
+    }
+    return sanitizar(String(auth.usuario.discordId));
+  }
+
+  return discordId;
+}
+
 function parseBody(body) {
   if (!body) return {};
   if (typeof body === "string") {
@@ -473,7 +486,7 @@ async function handleFacciones(req, res, connection, auth, action, body) {
 
   // ─── MI FACCION ───
   if (action === "mi_faccion" && req.method === "GET") {
-    const discordId = sanitizar(req.query.discordId || "");
+    const discordId = resolverDiscordIdSolicitado(req.query.discordId, auth);
     const slot = parseInt(req.query.slot || "1", 10);
     if (!discordId) return res.status(400).json({ error: "discordId requerido" });
 
@@ -496,63 +509,9 @@ async function handleFacciones(req, res, connection, auth, action, body) {
 
   // ─── UNIRSE A FACCION ───
   if (action === "unirse" && req.method === "POST") {
-    const discordId = sanitizar(body.discordId || "");
-    const slot = parseInt(body.slot || "1", 10);
-    const faccionId = parseInt(body.faccionId, 10);
-    const aprobacionExamen = body.aprobacionExamen === true;
-
-    if (!discordId || isNaN(faccionId)) {
-      return res.status(400).json({ error: "discordId y faccionId requeridos" });
-    }
-
-    if (!aprobacionExamen) {
-      return res.status(403).json({ error: "No puedes unirte directamente. Debes aprobar el examen y ser agregado por un administrador." });
-    }
-
-    if (auth.origen !== "web" || !auth?.usuario?.discordId) {
-      return res.status(403).json({ error: "Solo un administrador puede aprobar ingresos a facciones." });
-    }
-
-    const [adminRows] = await connection.execute(
-      "SELECT id FROM admins WHERE discord_id = ? LIMIT 1",
-      [String(auth.usuario.discordId)]
-    );
-    if (adminRows.length === 0) {
-      return res.status(403).json({ error: "No tienes permisos para aprobar examenes de faccion." });
-    }
-
-    const [ya] = await connection.execute(
-      "SELECT id FROM faccion_miembros WHERE discord_id = ? AND slot_number = ?",
-      [discordId, slot]
-    );
-    if (ya.length > 0) return res.status(400).json({ error: "Ya perteneces a una faccion" });
-
-    const [faccion] = await connection.execute(
-      "SELECT id, max_miembros, nombre FROM facciones WHERE id = ? AND activa = 1 LIMIT 1",
-      [faccionId]
-    );
-    if (faccion.length === 0) return res.status(404).json({ error: "Faccion no encontrada" });
-
-    const [count] = await connection.execute(
-      "SELECT COUNT(*) as total FROM faccion_miembros WHERE faccion_id = ?",
-      [faccionId]
-    );
-    if (count[0].total >= faccion[0].max_miembros) {
-      return res.status(400).json({ error: "La faccion esta llena" });
-    }
-
-    await connection.execute(
-      "INSERT INTO faccion_miembros (faccion_id, discord_id, slot_number, rango) VALUES (?, ?, ?, 'recluta')",
-      [faccionId, discordId, slot]
-    );
-
-    await registrarEvento(auth.origen, discordId, "unirse_faccion", {
-      entidadTipo: "faccion",
-      entidadId: String(faccionId),
-      datosDespues: { faccion: faccion[0].nombre },
+    return res.status(403).json({
+      error: "No puedes unirte directamente a una faccion. Solo un administrador puede asignarte desde el panel admin.",
     });
-
-    return res.status(200).json({ ok: true, faccion: faccion[0].nombre, rango: "recluta" });
   }
 
   // ─── SALIR DE FACCION ───
@@ -578,7 +537,7 @@ async function handleFacciones(req, res, connection, auth, action, body) {
 
   // ─── DEPOSITAR FONDOS A FACCION ───
   if (action === "depositar" && req.method === "POST") {
-    const discordId = sanitizar(body.discordId || "");
+    const discordId = resolverDiscordIdSolicitado(body.discordId, auth);
     const slot = parseInt(body.slot || "1", 10);
     const monto = parseInt(body.monto, 10);
 

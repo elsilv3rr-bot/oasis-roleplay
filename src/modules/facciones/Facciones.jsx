@@ -1,8 +1,8 @@
 // MODULO: Facciones - Panel de facciones del jugador //
 import { useState, useEffect, useCallback } from "react";
-import { listarFacciones, detalleFaccion, miFaccion, unirseFaccion, depositarFaccion } from "../../api";
+import { listarFacciones, detalleFaccion, miFaccion, depositarFaccion } from "../../api";
 
-function Facciones({ slotNumber = 1, esAdmin = false }) {
+function Facciones({ slotNumber = 1 }) {
   const [vista, setVista] = useState("mi_faccion");
   const [miFaccionData, setMiFaccion] = useState(null);
   const [faccionesLista, setFaccionesLista] = useState([]);
@@ -29,16 +29,6 @@ function Facciones({ slotNumber = 1, esAdmin = false }) {
   }, [vista, slotNumber]);
 
   useEffect(() => { cargar(); }, [cargar]);
-
-  async function handleUnirse(faccionId) {
-    try {
-      const data = await unirseFaccion(faccionId, slotNumber, esAdmin);
-      setMensaje(`✅ Te uniste a ${data.faccion} como ${data.rango}`);
-      setVista("mi_faccion");
-    } catch (err) {
-      setMensaje("Error: " + err.message);
-    }
-  }
 
   async function handleDepositar() {
     const monto = parseInt(montoDeposito, 10);
@@ -118,10 +108,9 @@ function Facciones({ slotNumber = 1, esAdmin = false }) {
             ) : (
               <div style={cardStyle}>
                 <p style={{ color: "#a0a0a0" }}>No perteneces a ninguna faccion.</p>
-                <button onClick={() => setVista("listar")}
-                  style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#7c3aed", color: "#fff", cursor: "pointer", marginTop: 8 }}>
-                  Ver facciones disponibles
-                </button>
+                <p style={{ color: "#d1d5db", margin: "8px 0 0" }}>
+                  Un administrador debe asignarte manualmente a una faccion.
+                </p>
               </div>
             )
           )}
@@ -146,16 +135,9 @@ function Facciones({ slotNumber = 1, esAdmin = false }) {
                   style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #2d2640", background: "transparent", color: "#7c3aed", cursor: "pointer", fontSize: 12 }}>
                   Ver detalle
                 </button>
-                {esAdmin ? (
-                  <button onClick={() => handleUnirse(f.id)}
-                    style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#7c3aed", color: "#fff", cursor: "pointer", fontSize: 12 }}>
-                    Unirme
-                  </button>
-                ) : (
-                  <span style={{ fontSize: 12, color: "#a0a0a0", alignSelf: "center" }}>
-                    Requiere examen y aprobacion administrativa
-                  </span>
-                )}
+                <span style={{ fontSize: 12, color: "#a0a0a0", alignSelf: "center" }}>
+                  El ingreso lo gestiona un administrador desde el panel admin
+                </span>
               </div>
             </div>
           ))}

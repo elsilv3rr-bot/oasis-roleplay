@@ -103,7 +103,7 @@ export default async function handler(req, res) {
 
       if (accion === "multas") {
         const [multas] = await connection.execute(
-          "SELECT * FROM multas WHERE stateid_infractor = ? AND pagada = 0 ORDER BY fecha DESC",
+          "SELECT * FROM multas WHERE stateid_infractor = ? ORDER BY fecha DESC",
           [personaje.stateid]
         );
 

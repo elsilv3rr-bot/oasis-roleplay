@@ -563,102 +563,166 @@ function Registro() {
 
   return (
     <div className="registro-container">
-      <div className="registro-card registro-card-wide">
-        <h2>SLOTS DE PERSONAJE</h2>
-        <p className="registro-subtitle">Selecciona o desbloquea un slot para jugar.</p>
+      <video className="video-bg" autoPlay loop muted playsInline preload="auto">
+        <source src="/video/video.mp4" type="video/mp4" />
+      </video>
 
-        {feedback && (
-          <div className={`registro-feedback ${feedback.type === "success" ? "ok" : "error"}`}>
-            {feedback.text}
+      <div className="registro-overlay" />
+
+      <div className="registro-layout">
+        <aside className="registro-showcase">
+          <div className="registro-showcase-panel registro-showcase-shop">
+            <div className="registro-panel-head">
+              <span className="registro-panel-kicker">Tienda</span>
+              <h3>Vehículos destacados</h3>
+            </div>
+
+            <a
+              className="registro-shop-card"
+              href="/expediente"
+              onClick={(event) => {
+                event.preventDefault();
+                navigate("/expediente");
+              }}
+            >
+              <img src="/autos/Marin.png" alt="Wolfsburgo Marin" className="registro-shop-image" />
+              <div className="registro-shop-content">
+                <span className="registro-shop-tag">Tienda Oficial</span>
+                <strong>Wolfsburgo Marin</strong>
+                <span>Ver catálogo completo y comprar autos dentro del juego.</span>
+              </div>
+            </a>
           </div>
-        )}
 
-        <div className="character-slots-grid">
-          {loadingSlots && <div className="slot-loading">Cargando slots...</div>}
+          <div className="registro-showcase-panel">
+            <div className="registro-panel-head">
+              <span className="registro-panel-kicker">VIP</span>
+              <h3>Mejora tu experiencia</h3>
+            </div>
 
-          {!loadingSlots && slots.map((slot) => {
-            const isCurrentSelection = selectedSlot === slot.slotNumber;
+            <div className="registro-vip-list">
+              <a className="registro-vip-card ruby" href="https://www.roblox.com/catalog/118394118154104" target="_blank" rel="noreferrer">
+                <span className="registro-vip-name">VIP Ruby</span>
+                <span className="registro-vip-link">Abrir en Roblox</span>
+              </a>
 
-            if (!slot.isUnlocked) {
-              return (
-                <div key={slot.slotNumber} className="slot-card locked">
-                  <div className="slot-header">
-                    <span>Slot {slot.slotNumber}</span>
-                    <AppIcon name="lock" size={16} />
-                  </div>
-                  <p className="slot-price">Precio: ${slot.unlockCost.toLocaleString("es-CL")}</p>
+              <a className="registro-vip-card zafiro" href="https://www.roblox.com/catalog/103769339745826" target="_blank" rel="noreferrer">
+                <span className="registro-vip-name">VIP Zafiro</span>
+                <span className="registro-vip-link">Abrir en Roblox</span>
+              </a>
+
+              <a className="registro-vip-card diamante" href="https://www.roblox.com/es/catalog/80266207412414/VIP-Diamante-Oasis-RP" target="_blank" rel="noreferrer">
+                <span className="registro-vip-name">VIP Diamante</span>
+                <span className="registro-vip-link">Abrir en Roblox</span>
+              </a>
+            </div>
+          </div>
+        </aside>
+
+        <section className="registro-selector-panel">
+          <div className="registro-selector-card">
+            <div className="registro-selector-header">
+              <span className="registro-panel-kicker">Derecha</span>
+              <h2>Bienvenido a Oasis Roleplay</h2>
+              <p className="registro-subtitle">Selecciona un personaje para continuar o crea uno nuevo en un slot libre.</p>
+            </div>
+
+            {feedback && (
+              <div className={`registro-feedback ${feedback.type === "success" ? "ok" : "error"}`}>
+                {feedback.text}
+              </div>
+            )}
+
+            <div className="character-slots-grid">
+              {loadingSlots && <div className="slot-loading">Cargando slots...</div>}
+
+              {!loadingSlots && slots.map((slot) => {
+                const isCurrentSelection = selectedSlot === slot.slotNumber;
+
+                if (!slot.isUnlocked) {
+                  return (
+                    <div key={slot.slotNumber} className="slot-card locked">
+                      <div className="slot-header">
+                        <span>Personaje {slot.slotNumber}</span>
+                        <AppIcon name="lock" size={16} />
+                      </div>
+                      <p className="slot-title">Slot bloqueado</p>
+                      <p className="slot-meta">Precio: ${slot.unlockCost.toLocaleString("es-CL")}</p>
+                      <button
+                        className="portal-button"
+                        onClick={() => desbloquearSlot(slot.slotNumber)}
+                        disabled={unlockingSlot === slot.slotNumber}
+                      >
+                        {unlockingSlot === slot.slotNumber ? "Desbloqueando..." : "Desbloquear"}
+                      </button>
+                    </div>
+                  );
+                }
+
+                if (slot.character) {
+                  return (
+                    <div key={slot.slotNumber} className={`slot-card ${isCurrentSelection ? "active" : ""}`}>
+                      <div className="slot-header">
+                        <span>Personaje {slot.slotNumber}</span>
+                        <span className="slot-badge">Activo</span>
+                      </div>
+                      <h4 className="slot-title">{slot.character.nombre}</h4>
+                      <p className="slot-meta">State ID: {slot.character.stateId}</p>
+                      <p className="slot-meta">Saldo: ${Number(slot.character.dinero || 0).toLocaleString("es-CL")}</p>
+                      <button className="portal-button" onClick={() => seleccionarPersonaje(slot.character)}>
+                        Entrar con este personaje
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
                   <button
-                    className="portal-button"
-                    onClick={() => desbloquearSlot(slot.slotNumber)}
-                    disabled={unlockingSlot === slot.slotNumber}
+                    key={slot.slotNumber}
+                    className={`slot-card empty ${isCurrentSelection ? "active" : ""}`}
+                    onClick={() => setSelectedSlot(slot.slotNumber)}
                   >
-                    {unlockingSlot === slot.slotNumber ? "Desbloqueando..." : "Desbloquear"}
+                    <div className="slot-header">
+                      <span>Personaje {slot.slotNumber}</span>
+                      <span className="slot-badge">Libre</span>
+                    </div>
+                    <p className="slot-title">Crear personaje</p>
+                    <p className="slot-meta">Selecciona este slot para registrarlo.</p>
                   </button>
-                </div>
-              );
-            }
+                );
+              })}
+            </div>
 
-            if (slot.character) {
-              return (
-                <div key={slot.slotNumber} className={`slot-card ${isCurrentSelection ? "active" : ""}`}>
-                  <div className="slot-header">
-                    <span>Slot {slot.slotNumber}</span>
-                    <span className="slot-badge">Disponible</span>
-                  </div>
-                  <h4>{slot.character.nombre}</h4>
-                  <p>State ID: {slot.character.stateId}</p>
-                  <p>Saldo: ${Number(slot.character.dinero || 0).toLocaleString("es-CL")}</p>
-                  <button className="portal-button" onClick={() => seleccionarPersonaje(slot.character)}>
-                    Jugar con este personaje
-                  </button>
-                </div>
-              );
-            }
+            {selectedSlotData?.isUnlocked && !selectedSlotData?.character && (
+              <div className="registro-form-wrap">
+                <h3>Crear personaje en Personaje {selectedSlot}</h3>
 
-            return (
-              <button
-                key={slot.slotNumber}
-                className={`slot-card empty ${isCurrentSelection ? "active" : ""}`}
-                onClick={() => setSelectedSlot(slot.slotNumber)}
-              >
-                <div className="slot-header">
-                  <span>Slot {slot.slotNumber}</span>
-                  <span className="slot-badge">Libre</span>
-                </div>
-                <p>Crear personaje en este slot</p>
-              </button>
-            );
-          })}
-        </div>
+                <input
+                  type="text"
+                  placeholder="Nombre"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                />
+                <input
+                  type="text"
+                  placeholder="Edad"
+                  value={edad}
+                  onChange={(e) => setEdad(e.target.value)}
+                />
+                <input
+                  type="text"
+                  placeholder="Nacionalidad"
+                  value={nacionalidad}
+                  onChange={(e) => setNacionalidad(e.target.value)}
+                />
 
-        {selectedSlotData?.isUnlocked && !selectedSlotData?.character && (
-          <div className="registro-form-wrap">
-            <h3>Crear Personaje en Slot {selectedSlot}</h3>
-
-            <input
-              type="text"
-              placeholder="Nombre"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Edad"
-              value={edad}
-              onChange={(e) => setEdad(e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Nacionalidad"
-              value={nacionalidad}
-              onChange={(e) => setNacionalidad(e.target.value)}
-            />
-
-            <button className="portal-button" onClick={enviarDatos} disabled={savingCharacter}>
-              {savingCharacter ? "Guardando..." : "Finalizar Registro"}
-            </button>
+                <button className="portal-button" onClick={enviarDatos} disabled={savingCharacter}>
+                  {savingCharacter ? "Guardando..." : "Finalizar Registro"}
+                </button>
+              </div>
+            )}
           </div>
-        )}
+        </section>
       </div>
     </div>
   );
@@ -667,7 +731,13 @@ function Registro() {
 /* ================== EXPEDIENTE ================== */
 function Expediente() {
   const navigate = useNavigate();
-  const datos = JSON.parse(localStorage.getItem("usuario"));
+  const [datos, setDatos] = React.useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("usuario") || "null");
+    } catch {
+      return null;
+    }
+  });
 
   // DATOS DE DISCORD DEL USUARIO //
   const discordUser = JSON.parse(localStorage.getItem("discord_user") || "null");
@@ -692,12 +762,14 @@ function Expediente() {
 
       if (!selectedCharacter) {
         localStorage.removeItem("usuario");
+        setDatos(null);
         navigate("/registro");
         return;
       }
 
       localStorage.setItem("usuario", JSON.stringify(selectedCharacter));
       localStorage.setItem("active_slot_number", String(selectedCharacter.slotNumber));
+      setDatos(selectedCharacter);
     };
 
     verificarAcceso();
@@ -853,6 +925,10 @@ useEffect(() => {
   // ================== MULTAS (Identidad / Municipalidad) ==================
   const [multasState, setMultasState] = React.useState([]);
   const [cargosState, setCargosState] = React.useState([]);
+  const multasPendientesState = React.useMemo(
+    () => multasState.filter((multa) => !multa.pagada),
+    [multasState]
+  );
 
   const cargarMultas = React.useCallback(async () => {
     try {
@@ -1439,10 +1515,10 @@ const comprarItem = async () => {
 
   // ================== MUNICIPALIDAD: PAGAR MULTAS ==================
   const parseMonto = (m) => Number(String(m ?? "").replace(/[^\d]/g, "")) || 0;
-  const totalMultas = multasState.reduce((acc, m) => acc + parseMonto(m.monto), 0);
+  const totalMultas = multasPendientesState.reduce((acc, m) => acc + parseMonto(m.monto), 0);
 
   const pagarMulta = async (multaId) => {
-    const multa = multasState.find((m) => m.id === multaId);
+    const multa = multasPendientesState.find((m) => m.id === multaId);
     if (!multa) return;
 
     const amount = parseMonto(multa.monto);
@@ -1490,7 +1566,7 @@ const comprarItem = async () => {
   };
 
   const pagarTodo = async () => {
-    if (multasState.length === 0) return;
+    if (multasPendientesState.length === 0) return;
 
     const amount = totalMultas;
     const from = bank.accounts.find((a) => a.id === bank.activeAccountId);
@@ -1717,6 +1793,7 @@ const comprarItem = async () => {
                         <p><strong>Fecha:</strong> {multa.fecha}</p>
                         <p><strong>Motivo:</strong> {multa.motivo}</p>
                         <p><strong>Monto:</strong> {multa.monto}</p>
+                        <p><strong>Estado:</strong> {multa.pagada ? "Pagada" : "Pendiente"}</p>
                         <hr />
                       </div>
                     ))}
@@ -2068,11 +2145,11 @@ const comprarItem = async () => {
                   </div>
 
                   <div className="muni-card-body">
-                    {multasState.length === 0 ? (
+                    {multasPendientesState.length === 0 ? (
                       <div className="muni-empty">No tienes multas pendientes.</div>
                     ) : (
                       <div className="muni-fines">
-                        {multasState.map((m) => (
+                        {multasPendientesState.map((m) => (
                           <div key={m.id} className="muni-fine">
                             <div className="muni-fine-left">
                               <div className="muni-fine-code">{m.motivo}</div>
@@ -2141,6 +2218,7 @@ const comprarItem = async () => {
                               <span className="tag">Multa</span>
                               <span className="tag">{m.fecha}</span>
                               <span className="tag money">{formatUSD(parseMonto(m.monto))}</span>
+                              <span className="tag">{m.pagada ? "PAGADA" : "PENDIENTE"}</span>
                             </div>
                             <div className="muni-history-motivo">{m.motivo}</div>
                           </div>
@@ -2476,7 +2554,7 @@ const comprarItem = async () => {
               {active === "misiones" && <Misiones />}
 
               {/* ================= FACCIONES ================= */}
-              {active === "facciones" && <Facciones slotNumber={datos.slotNumber || 1} esAdmin={esAdminUsuario} />}
+              {active === "facciones" && <Facciones slotNumber={datos.slotNumber || 1} />}
 
               {/* ================= LEADERBOARD ================= */}
               {active === "leaderboard" && <Leaderboard />}
@@ -2827,6 +2905,16 @@ function PoliciaPanel({ datos }) {
   const [matriculaBusqueda, setMatriculaBusqueda] = React.useState("");
   const [vehiculoResultado, setVehiculoResultado] = React.useState(null);
 
+  const refrescarCiudadano = React.useCallback(async (stateid) => {
+    if (!stateid) return;
+    try {
+      const data = await consultaPolicial("consultar_ciudadano", `&stateid=${stateid}`, datos.slotNumber || 1);
+      setResultado(data);
+    } catch {
+      // No interrumpir el flujo principal si falla la recarga visual.
+    }
+  }, [datos.slotNumber]);
+
   const buscarCiudadano = async () => {
     if (!busqueda.trim()) return;
     setCargando(true);
@@ -2846,14 +2934,16 @@ function PoliciaPanel({ datos }) {
     if (!multaStateid || !multaMotivo || !multaMonto) return;
     setMensaje(null);
     try {
+      const stateid = multaStateid.trim();
       await accionPolicial({
         accion: "imponer_multa",
-        stateid_infractor: multaStateid.trim(),
+        stateid_infractor: stateid,
         motivo: multaMotivo,
         monto: Number(multaMonto),
         slotNumber: datos.slotNumber || 1,
       });
       setMensaje({ tipo: "ok", texto: "Multa impuesta correctamente" });
+      await refrescarCiudadano(stateid);
       setMultaStateid(""); setMultaMotivo(""); setMultaMonto("");
     } catch (err) {
       setMensaje({ tipo: "error", texto: err.message });
@@ -2864,14 +2954,16 @@ function PoliciaPanel({ datos }) {
     if (!cargoStateid || !cargoTexto) return;
     setMensaje(null);
     try {
+      const stateid = cargoStateid.trim();
       await accionPolicial({
         accion: "agregar_cargo",
-        stateid_acusado: cargoStateid.trim(),
+        stateid_acusado: stateid,
         cargo: cargoTexto,
         gravedad: cargoGravedad,
         slotNumber: datos.slotNumber || 1,
       });
       setMensaje({ tipo: "ok", texto: "Cargo judicial registrado" });
+      await refrescarCiudadano(stateid);
       setCargoStateid(""); setCargoTexto(""); setCargoGravedad("leve");
     } catch (err) {
       setMensaje({ tipo: "error", texto: err.message });
@@ -3039,6 +3131,7 @@ function AdminPanel({ discordId }) {
   const [multaMotivoAdmin, setMultaMotivoAdmin] = React.useState("");
   const [multaMontoAdmin, setMultaMontoAdmin] = React.useState("");
   const [multaIdQuitarAdmin, setMultaIdQuitarAdmin] = React.useState("");
+  const [cargoIdQuitarAdmin, setCargoIdQuitarAdmin] = React.useState("");
   const [vehiculoStockId, setVehiculoStockId] = React.useState("");
   const [vehiculoStockDelta, setVehiculoStockDelta] = React.useState("1");
   const [itemStockId, setItemStockId] = React.useState("");
@@ -3372,6 +3465,17 @@ function AdminPanel({ discordId }) {
                   ejecutarAccion("quitar_multa_admin", { multa_id: multaIdQuitarAdmin });
                   setMultaIdQuitarAdmin("");
                 }}>Quitar Multa</button>
+              </div>
+            </div>
+
+            <div className="admin-accion-grupo">
+              <h4>Quitar Cargo Judicial</h4>
+              <div className="admin-input-row">
+                <input type="number" placeholder="ID de cargo" value={cargoIdQuitarAdmin} onChange={e => setCargoIdQuitarAdmin(e.target.value)} />
+                <button className="admin-btn-danger" onClick={() => {
+                  ejecutarAccion("quitar_cargo_admin", { cargo_id: cargoIdQuitarAdmin });
+                  setCargoIdQuitarAdmin("");
+                }}>Quitar Cargo</button>
               </div>
             </div>
           </div>
