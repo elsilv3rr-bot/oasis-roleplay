@@ -1014,6 +1014,16 @@ React.useEffect(() => {
     return saved ? JSON.parse(saved) : defaultBank;
   });
 
+  // Recargar banco de localStorage cuando el personaje activo cambia //
+  const prevBankKeyRef = React.useRef(bankKey);
+  React.useEffect(() => {
+    if (prevBankKeyRef.current !== bankKey) {
+      prevBankKeyRef.current = bankKey;
+      const saved = localStorage.getItem(bankKey);
+      setBank(saved ? JSON.parse(saved) : defaultBank);
+    }
+  }, [bankKey, defaultBank]);
+
   React.useEffect(() => {
     localStorage.setItem(bankKey, JSON.stringify(bank));
   }, [bank, bankKey]);

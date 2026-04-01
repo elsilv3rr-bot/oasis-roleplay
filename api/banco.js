@@ -220,7 +220,16 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "No puedes transferirte a ti mismo" });
       }
 
-      await connection.execute("UPDATE usuarios SET dinero = dinero - ? WHERE id = ?", [parsedAmount, sender.id]);
+      const [debitResult] = await connection.execute(
+        "UPDATE usuarios SET dinero = dinero - ? WHERE id = ? AND dinero >= ?",
+        [parsedAmount, sender.id, parsedAmount]
+      );
+
+      if (debitResult.affectedRows !== 1) {
+        await connection.rollback();
+        return res.status(409).json({ error: "No se pudo procesar la transferencia de forma segura" });
+      }
+
       await connection.execute("UPDATE usuarios SET dinero = dinero + ? WHERE id = ?", [parsedAmount, recipientRows[0].id]);
       await connection.commit();
 
@@ -247,7 +256,16 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Saldo insuficiente" });
       }
 
-      await connection.execute("UPDATE usuarios SET dinero = dinero - ? WHERE id = ?", [parsedAmount, personaje.id]);
+      const [debitResult] = await connection.execute(
+        "UPDATE usuarios SET dinero = dinero - ? WHERE id = ? AND dinero >= ?",
+        [parsedAmount, personaje.id, parsedAmount]
+      );
+
+      if (debitResult.affectedRows !== 1) {
+        await connection.rollback();
+        return res.status(409).json({ error: "No se pudo procesar el debito de forma segura" });
+      }
+
       await connection.commit();
 
       return res.status(200).json({ ok: true, dinero: saldoActual - parsedAmount });
@@ -466,7 +484,16 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Saldo insuficiente" });
       }
 
-      await connection.execute("UPDATE usuarios SET dinero = dinero - ? WHERE id = ?", [precio, personaje.id]);
+      const [debitResult] = await connection.execute(
+        "UPDATE usuarios SET dinero = dinero - ? WHERE id = ? AND dinero >= ?",
+        [precio, personaje.id, precio]
+      );
+
+      if (debitResult.affectedRows !== 1) {
+        await connection.rollback();
+        return res.status(409).json({ error: "No se pudo procesar la compra de forma segura" });
+      }
+
       await connection.execute("UPDATE vehiculos_tienda SET stock_global = stock_global - 1 WHERE id_vehiculo = ?", [vehiculoId]);
 
       const itemUid = generarIdMercado();
@@ -539,7 +566,16 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Saldo insuficiente" });
       }
 
-      await connection.execute("UPDATE usuarios SET dinero = dinero - ? WHERE id = ?", [precio, personaje.id]);
+      const [debitResult] = await connection.execute(
+        "UPDATE usuarios SET dinero = dinero - ? WHERE id = ? AND dinero >= ?",
+        [precio, personaje.id, precio]
+      );
+
+      if (debitResult.affectedRows !== 1) {
+        await connection.rollback();
+        return res.status(409).json({ error: "No se pudo procesar la compra de forma segura" });
+      }
+
       await connection.execute("UPDATE mercado_items SET stock_global = stock_global - 1 WHERE id_item = ?", [itemId]);
 
       const itemUid = generarIdMercado();
@@ -692,7 +728,15 @@ export default async function handler(req, res) {
 
       const saldoFinal = saldoActual - apuesta + ganancia;
 
-      await connection.execute("UPDATE usuarios SET dinero = ? WHERE id = ?", [saldoFinal, personaje.id]);
+      const [casinoDebit] = await connection.execute(
+        "UPDATE usuarios SET dinero = dinero - ? + ? WHERE id = ? AND dinero >= ?",
+        [apuesta, ganancia, personaje.id, apuesta]
+      );
+
+      if (casinoDebit.affectedRows !== 1) {
+        await connection.rollback();
+        return res.status(409).json({ error: "No se pudo procesar la jugada de forma segura" });
+      }
       await connection.execute(
         "INSERT INTO casino_jugadas (discord_id, slot_number, juego, apuesta, ganancia, resultado) VALUES (?, ?, ?, ?, ?, ?)",
         [decoded.discordId, slotNumber, juego, apuesta, ganancia, resultado]

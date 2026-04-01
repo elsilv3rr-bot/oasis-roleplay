@@ -257,6 +257,10 @@ export default async function handler(req, res) {
       const { stateid, cantidad, operacion } = body;
       if (!stateid || !cantidad) return res.status(400).json({ error: "stateid y cantidad requeridos" });
 
+      if (operacion !== "agregar" && operacion !== "quitar") {
+        return res.status(400).json({ error: "Operacion invalida. Debe ser 'agregar' o 'quitar'" });
+      }
+
       const monto = Math.floor(Number(cantidad));
       if (!monto || monto <= 0) return res.status(400).json({ error: "Cantidad invalida" });
 
@@ -298,6 +302,15 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: "Accion permitida solo desde el panel web" });
       }
 
+      if (body.operacion !== "agregar" && body.operacion !== "quitar") {
+        return res.status(400).json({ error: "Operacion invalida. Debe ser 'agregar' o 'quitar'" });
+      }
+
+      const confirmacion = String(body.confirmacion || "").trim();
+      if (confirmacion !== "CONFIRMAR_GLOBAL") {
+        return res.status(400).json({ error: "Se requiere confirmacion: envia confirmacion='CONFIRMAR_GLOBAL'" });
+      }
+
       const { cantidad, operacion } = body;
       const monto = Math.floor(Number(cantidad));
       if (!monto || monto <= 0) return res.status(400).json({ error: "Cantidad invalida" });
@@ -305,7 +318,7 @@ export default async function handler(req, res) {
       await connection.beginTransaction();
 
       const [beforeRows] = await connection.execute(
-        "SELECT COUNT(*) AS total, COALESCE(SUM(dinero), 0) AS suma FROM usuarios"
+        "SELECT COUNT(*) AS total, COALESCE(SUM(dinero), 0) AS suma FROM usuarios FOR UPDATE"
       );
 
       let updateResult;
@@ -325,8 +338,6 @@ export default async function handler(req, res) {
         "SELECT COUNT(*) AS total, COALESCE(SUM(dinero), 0) AS suma FROM usuarios"
       );
 
-      await connection.commit();
-
       const antes = Number(beforeRows[0]?.suma || 0);
       const despues = Number(afterRows[0]?.suma || 0);
       const totalUsuarios = Number(afterRows[0]?.total || 0);
@@ -338,6 +349,8 @@ export default async function handler(req, res) {
         null,
         `Usuarios: ${totalUsuarios}, Total antes: $${antes}, Total despues: $${despues}`
       );
+
+      await connection.commit();
 
       return res.status(200).json({
         ok: true,
