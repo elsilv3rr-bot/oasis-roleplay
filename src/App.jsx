@@ -1831,6 +1831,7 @@ const comprarItem = async () => {
                     {multasState.map((multa) => (
                       <div key={`multa_${multa.id}`} className="multa-item">
                         <p><strong>Tipo:</strong> Multa</p>
+                        <p><strong>ID:</strong> {multa.id}</p>
                         <p><strong>Fecha:</strong> {multa.fecha}</p>
                         <p><strong>Motivo:</strong> {multa.motivo}</p>
                         <p><strong>Monto:</strong> {multa.monto}</p>
